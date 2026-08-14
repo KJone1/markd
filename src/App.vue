@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import CodeEditor from "./components/CodeEditor.vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+} from "vue";
 import ErrorToast from "./components/ErrorToast.vue";
 import FileTreeDialog from "./components/FileTreeDialog.vue";
 import HtmlPreview from "./components/HtmlPreview.vue";
-import MarkdownEditor from "./components/MarkdownEditor.vue";
 import { DocumentSession } from "./document_session.ts";
 import type {
   ActiveFile,
@@ -12,6 +17,13 @@ import type {
   WorkspaceNavigation,
   WorkspaceState,
 } from "./shared/desktop.ts";
+
+const CodeEditor = defineAsyncComponent(
+  () => import("./components/CodeEditor.vue"),
+);
+const MarkdownEditor = defineAsyncComponent(
+  () => import("./components/MarkdownEditor.vue"),
+);
 
 const primaryAction = ref<HTMLButtonElement>();
 const appInfo = ref<AppInfo>();
@@ -121,13 +133,17 @@ async function loadNavigation(): Promise<void> {
 async function openFile(path: string): Promise<void> {
   const accepted = await window.markdBeforeWorkspaceSwitch?.() ?? true;
   if (!accepted) return;
-  const activeFile = await bindings.openWorkspaceFile(path);
-  navigation.value = {
-    ...navigation.value,
-    activeFile,
-  };
-  if (activeFile.kind === "html") htmlReloadKey.value += 1;
-  activateDocument(activeFile);
+  try {
+    const activeFile = await bindings.openWorkspaceFile(path);
+    navigation.value = {
+      ...navigation.value,
+      activeFile,
+    };
+    if (activeFile.kind === "html") htmlReloadKey.value += 1;
+    activateDocument(activeFile);
+  } catch {
+    saveError.value = "Markd could not open this file.";
+  }
 }
 
 function activateDocument(activeFile: ActiveFile | null): void {
@@ -232,15 +248,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="['shell', { 'shell-preview': navigation.activeFile?.kind === 'html' }]">
-    <header v-if="navigation.activeFile?.kind !== 'html'" class="topbar">
-      <div class="brand" aria-label="Markd home">
-        <span class="brand-mark" aria-hidden="true">M</span>
-        <span>Markd</span>
-      </div>
-      <span class="foundation-badge">Local desktop</span>
-    </header>
-
+  <div class="shell">
     <main
       v-if="navigation.activeFile === null"
       class="main"
@@ -310,7 +318,8 @@ onBeforeUnmount(() => {
         @change="editDocument"
       />
       <section
-        :class="['document-surface', { 'document-surface-overlay': navigation.activeFile.kind === 'code' || navigation.activeFile.kind === 'markdown' }]"
+        v-if="navigation.activeFile.kind !== 'code' && navigation.activeFile.kind !== 'markdown'"
+        class="document-surface"
         aria-labelledby="document-title"
       >
         <p class="eyebrow">{{ routeLabel(navigation.activeFile) }}</p>
@@ -321,16 +330,11 @@ onBeforeUnmount(() => {
         <p v-if="navigation.activeFile.kind === 'information'" class="document-note">
           This file is available as information only and its contents were not loaded.
         </p>
-        <p v-else-if="navigation.activeFile.kind !== 'code' && navigation.activeFile.kind !== 'markdown'" class="document-note">
+        <p v-else class="document-note">
           The {{ routeLabel(navigation.activeFile).toLowerCase() }} route is ready for its editor.
         </p>
       </section>
     </main>
-
-    <footer v-if="navigation.activeFile?.kind !== 'html'" class="footer">
-      <span>Private by design</span>
-      <span>Files stay under your control</span>
-    </footer>
 
     <FileTreeDialog
       :open="treeOpen"
