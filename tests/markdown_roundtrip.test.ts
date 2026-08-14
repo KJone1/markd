@@ -5,9 +5,11 @@ import {
   screen,
   waitFor,
 } from "@testing-library/vue";
+import { Crepe } from "@milkdown/crepe";
 import axe from "axe-core";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import MarkdownEditor from "../src/components/MarkdownEditor.vue";
+import { frontmatterFeature } from "../src/editor/frontmatter.ts";
 
 const representativeMarkdown = [
   "# Heading",
@@ -252,5 +254,262 @@ describe("Markdown round trips", () => {
       expect(markdown).toContain("```ts");
       expect(markdown).toContain("| Name");
     });
+  });
+});
+
+describe("Top bar", () => {
+  it("shows a persistent, fully-named formatting bar and hides the block hover handle", async () => {
+    const view = render(MarkdownEditor, {
+      props: { path: "notes/topbar.md", content: "Plain paragraph" },
+    });
+    await screen.findByRole("textbox", { name: "Editing notes/topbar.md" });
+
+    expect(view.container.querySelector(".milkdown-top-bar")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Paragraph" }))
+      .toBeTruthy();
+    for (
+      const name of [
+        "Bold",
+        "Italic",
+        "Strikethrough",
+        "Inline code",
+        "Bullet list",
+        "Ordered list",
+        "Task list",
+        "Insert link",
+        "Insert image",
+        "Insert table",
+        "Code block",
+        "Quote",
+        "Divider",
+      ]
+    ) {
+      expect(await screen.findByRole("button", { name })).toBeTruthy();
+    }
+    expect(
+      view.container.querySelectorAll(".milkdown-top-bar .top-bar-item"),
+    ).toHaveLength(13);
+
+    const paragraph = view.container.querySelector(".ProseMirror p")!;
+    await fireEvent.mouseOver(paragraph);
+    expect(view.container.querySelector(".milkdown-block-handle")).toBeNull();
+
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const results = await axe.run(view.container);
+    expect(results.violations).toEqual([]);
+  });
+
+  it("applies a heading level from the top bar without requiring a text selection", async () => {
+    const view = render(MarkdownEditor, {
+      props: { path: "notes/heading.md", content: "Plain paragraph" },
+    });
+    await screen.findByRole("textbox", { name: "Editing notes/heading.md" });
+
+    const headingButton = await screen.findByRole("button", {
+      name: "Paragraph",
+    });
+    await fireEvent.pointerDown(headingButton);
+    const headingOneOption = await screen.findByRole("button", {
+      name: "Heading 1",
+    });
+    await fireEvent.pointerDown(headingOneOption);
+
+    await waitFor(() => {
+      const markdown = view.emitted<string[]>("change").at(-1)![0]!;
+      expect(markdown).toContain("# Plain paragraph");
+    });
+    expect(await screen.findByRole("button", { name: "Heading 1" }))
+      .toBeTruthy();
+  });
+});
+
+describe("Frontmatter", () => {
+  it("collapses a leading YAML frontmatter block into a metadata row and expands to read-only key/value rows", async () => {
+    const content = [
+      "---",
+      "title: Example",
+      "count: 3",
+      "---",
+      "",
+      "# Body heading",
+    ].join("\n");
+    const view = render(MarkdownEditor, {
+      props: { path: "notes/frontmatter.md", content },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing notes/frontmatter.md",
+    });
+    await waitFor(() => {
+      expect(editor.querySelector(".frontmatter-block")).toBeTruthy();
+    });
+    const block = editor.querySelector<HTMLElement>(".frontmatter-block")!;
+    expect(block.textContent).toContain("metadata");
+    expect(editor.querySelector("h1")?.textContent).toBe("Body heading");
+    expect(editor.textContent).not.toContain("title: Example");
+
+    const entries = block.querySelector<HTMLElement>(".frontmatter-content")!;
+    const expandButton = screen.getByRole("button", {
+      name: "Expand metadata",
+    });
+    expect(expandButton.getAttribute("aria-expanded")).toBe("false");
+    expect(entries.style.display).toBe("none");
+
+    await fireEvent.click(expandButton);
+    expect(entries.style.display).toBe("");
+    expect(
+      screen.getByRole("button", { name: "Collapse metadata" }),
+    ).toBeTruthy();
+    const keys = [...block.querySelectorAll(".frontmatter-key")].map(
+      (node) => node.textContent,
+    );
+    const values = [...block.querySelectorAll(".frontmatter-value")].map(
+      (node) => node.textContent,
+    );
+    expect(keys).toEqual(["title", "count"]);
+    expect(values).toEqual(["Example", "3"]);
+    expect(view.emitted("change")).toBeUndefined();
+
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const results = await axe.run(view.container);
+    expect(results.violations).toEqual([]);
+  });
+
+  it("preserves frontmatter comments, quoting, and key order verbatim on save", async () => {
+    const opening = [
+      "---",
+      "# leading comment",
+      'title: "Quoted Value"',
+      "tags:",
+      "  - alpha",
+      "  - beta",
+      "count: 3",
+      "---",
+    ].join("\n");
+    const source = `${[opening, "", "Body text", ""].join("\n")}`;
+    const view = render(MarkdownEditor, {
+      props: { path: "notes/preserve.md", content: source },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing notes/preserve.md",
+    });
+    const heading = await waitFor(() => {
+      const paragraph = [...editor.querySelectorAll("p")].find(
+        (candidate) => candidate.textContent === "Body text",
+      );
+      expect(paragraph).toBeTruthy();
+      return paragraph!;
+    });
+    heading.textContent = "Edited body";
+    await fireEvent.input(editor);
+    await waitFor(() => {
+      const markdown = view.emitted<string[]>("change").at(-1)![0]!;
+      expect(markdown.startsWith(opening)).toBe(true);
+      expect(markdown).toContain("Edited body");
+    });
+  });
+
+  it("round-trips a frontmatter block byte-for-byte with no edits", async () => {
+    const source = `${
+      [
+        "---",
+        "# leading comment",
+        'title: "Quoted Value"',
+        "tags:",
+        "  - alpha",
+        "  - beta",
+        "count: 3",
+        "---",
+        "",
+        "Body text",
+        "",
+      ].join("\n")
+    }`;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const crepe = new Crepe({ root: host, defaultValue: source });
+    crepe.addFeature(frontmatterFeature);
+    await crepe.create();
+
+    expect(crepe.getMarkdown()).toBe(source);
+    expect(host.querySelector(".frontmatter-block")).toBeTruthy();
+
+    await crepe.destroy();
+  });
+
+  it("treats a --- line outside the document start as a thematic break, not frontmatter", async () => {
+    const content = ["# Heading", "", "---", "", "More text"].join("\n");
+    const view = render(MarkdownEditor, {
+      props: { path: "notes/hr.md", content },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing notes/hr.md",
+    });
+    await waitFor(() => {
+      expect(editor.querySelector("hr")).toBeTruthy();
+    });
+    expect(editor.querySelector(".frontmatter-block")).toBeNull();
+
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const results = await axe.run(view.container);
+    expect(results.violations).toEqual([]);
+  });
+
+  it("shows a fallback message for empty frontmatter without breaking the editor", async () => {
+    const content = ["---", "---", "", "Body"].join("\n");
+    render(MarkdownEditor, {
+      props: { path: "notes/empty-frontmatter.md", content },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing notes/empty-frontmatter.md",
+    });
+    await waitFor(() => {
+      expect(editor.querySelector(".frontmatter-block")).toBeTruthy();
+    });
+    await fireEvent.click(
+      screen.getByRole("button", { name: "Expand metadata" }),
+    );
+    expect(editor.querySelector(".frontmatter-empty")?.textContent).toBe(
+      "No metadata",
+    );
+    expect(editor.textContent).toContain("Body");
+  });
+
+  it("does not treat frontmatter without a closing delimiter as metadata", async () => {
+    const content = ["---", "title: Example", "", "Body"].join("\n");
+    render(MarkdownEditor, {
+      props: { path: "notes/unclosed-frontmatter.md", content },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing notes/unclosed-frontmatter.md",
+    });
+    await waitFor(() => {
+      expect(editor.textContent).toContain("Body");
+    });
+    expect(editor.querySelector(".frontmatter-block")).toBeNull();
+  });
+
+  it("renders and round-trips a file containing only frontmatter", async () => {
+    const source = `${["---", "title: Example", "---", ""].join("\n")}`;
+    const view = render(MarkdownEditor, {
+      props: { path: "notes/only-frontmatter.md", content: source },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing notes/only-frontmatter.md",
+    });
+    await waitFor(() => {
+      expect(editor.querySelector(".frontmatter-block")).toBeTruthy();
+    });
+
+    const host = document.createElement("div");
+    document.body.append(host);
+    const crepe = new Crepe({ root: host, defaultValue: source });
+    crepe.addFeature(frontmatterFeature);
+    await crepe.create();
+    expect(crepe.getMarkdown()).toBe(source);
+    await crepe.destroy();
+
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const results = await axe.run(view.container);
+    expect(results.violations).toEqual([]);
   });
 });

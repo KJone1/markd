@@ -19,6 +19,7 @@ const editorWiring = vi.hoisted(() => ({ codeResolvers: [] as unknown[] }));
 vi.mock("../src/components/CodeEditor.vue", async () => {
   const { defineComponent, h } = await import("vue");
   return {
+    __esModule: true,
     default: defineComponent({
       props: { path: String, content: String, resolveImage: Function },
       emits: ["change"],
@@ -41,6 +42,7 @@ vi.mock("../src/components/MarkdownEditor.vue", async () => {
     "vue"
   );
   return {
+    __esModule: true,
     default: defineComponent({
       props: { path: String, content: String, resolveImage: Function },
       emits: ["change"],
@@ -176,6 +178,78 @@ describe("Markd shell", () => {
       .toBeTruthy();
     expect(screen.queryByText(/route is ready for its editor/i)).toBeNull();
     expect(screen.queryByTitle(/Previewing/)).toBeNull();
+    expect(screen.queryByRole("heading", { name: "guide.markdown" })).toBeNull();
+    expect(screen.queryByText("guide.markdown", { selector: ".document-path" }))
+      .toBeNull();
+  });
+
+  it("renders no header, footer, or document chrome around an active document", async () => {
+    vi.stubGlobal("bindings", {
+      getAppInfo: vi.fn().mockResolvedValue({
+        name: "Markd",
+        platform: "darwin",
+        arch: "aarch64",
+        runtime: "Deno 2.9.0",
+      }),
+      getWorkspaceState: vi.fn().mockResolvedValue({
+        activePath: "/Users/example/Notes",
+        recentWorkspaces: ["/Users/example/Notes"],
+      }),
+      getWorkspaceNavigation: vi.fn().mockResolvedValue({
+        rootPath: "/Users/example/Notes",
+        entries: [{ kind: "file", name: "guide.markdown", path: "guide.markdown" }],
+        activeFile: {
+          kind: "markdown",
+          path: "guide.markdown",
+          content: "# Guide",
+        },
+      }),
+      openWorkspaceFile: vi.fn(),
+      saveWorkspaceDocument: vi.fn(),
+      openFolder: vi.fn(),
+    });
+
+    render(App);
+
+    expect(await screen.findByTestId("milkdown-crepe")).toBeTruthy();
+    expect(screen.queryByRole("banner")).toBeNull();
+    expect(screen.queryByRole("contentinfo")).toBeNull();
+    expect(document.querySelector(".document-surface")).toBeNull();
+  });
+
+  it("keeps the document card with filename, path, and reason for a binary file", async () => {
+    vi.stubGlobal("bindings", {
+      getAppInfo: vi.fn().mockResolvedValue({
+        name: "Markd",
+        platform: "darwin",
+        arch: "aarch64",
+        runtime: "Deno 2.9.0",
+      }),
+      getWorkspaceState: vi.fn().mockResolvedValue({
+        activePath: "/Users/example/Notes",
+        recentWorkspaces: ["/Users/example/Notes"],
+      }),
+      getWorkspaceNavigation: vi.fn().mockResolvedValue({
+        rootPath: "/Users/example/Notes",
+        entries: [{ kind: "file", name: "photo.png", path: "assets/photo.png" }],
+        activeFile: {
+          kind: "information",
+          path: "assets/photo.png",
+          reason: "binary",
+        },
+      }),
+      openWorkspaceFile: vi.fn(),
+      openFolder: vi.fn(),
+    });
+
+    render(App);
+
+    expect(await screen.findByRole("heading", { name: "photo.png" }))
+      .toBeTruthy();
+    expect(screen.getByText("assets/photo.png")).toBeTruthy();
+    expect(screen.getByText("Binary file")).toBeTruthy();
+    expect(screen.queryByRole("banner")).toBeNull();
+    expect(screen.queryByRole("contentinfo")).toBeNull();
   });
 
   it("saves Markdown changes through the shared debounced session and Cmd+S", async () => {
@@ -337,6 +411,21 @@ describe("Markd shell", () => {
     expect(await screen.findByRole("textbox", { name: "Editing app.ts" }))
       .toBeTruthy();
     expect(markdownLifecycle).toEqual({ mounted: 2, unmounted: 2 });
+    expect(screen.queryByTestId("milkdown-crepe")).toBeNull();
+
+    globalThis.dispatchEvent(
+      new CustomEvent("markd-files-change", {
+        detail: {
+          rootPath: "/Users/example/Notes",
+          entries: [],
+          activeFile: { kind: "markdown", path: "third.md", content: "# Third" },
+        },
+      }),
+    );
+    expect(await screen.findByRole("textbox", { name: "Editing third.md" }))
+      .toBeTruthy();
+    expect(markdownLifecycle).toEqual({ mounted: 3, unmounted: 2 });
+    expect(screen.queryByRole("textbox", { name: "Editing app.ts" })).toBeNull();
   });
 
   it("replaces the Markdown editor when another workspace has the same relative path", async () => {
@@ -593,7 +682,7 @@ describe("Markd shell", () => {
     ).toBe("http://127.0.0.1:49152/index.html");
   });
 
-  it("renders named application regions and moves initial focus to the primary action", async () => {
+  it("renders no page header or footer around the welcome region and moves initial focus to the primary action", async () => {
     const openFolder = vi.fn().mockResolvedValue({
       activePath: "/Users/example/Notes",
       recentWorkspaces: ["/Users/example/Notes"],
@@ -621,7 +710,8 @@ describe("Markd shell", () => {
 
     render(App);
 
-    expect(screen.getByRole("banner")).toBeTruthy();
+    expect(screen.queryByRole("banner")).toBeNull();
+    expect(screen.queryByRole("contentinfo")).toBeNull();
     expect(screen.getByRole("main", { name: "Welcome to Markd" })).toBeTruthy();
     expect(screen.getByRole("status")).toBeTruthy();
 
@@ -697,7 +787,10 @@ describe("Markd shell", () => {
     await fireEvent.click(screen.getByRole("treeitem", { name: "today.md" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(openWorkspaceFile).toHaveBeenCalledWith("notes/today.md");
-    expect(screen.getByText("Markdown document")).toBeTruthy();
+    expect(
+      await screen.findByRole("textbox", { name: "Editing notes/today.md" }),
+    ).toBeTruthy();
+    expect(screen.queryByText("Markdown document")).toBeNull();
 
     await fireEvent.keyDown(window, { key: "p", metaKey: true });
     expect(screen.getByRole("dialog", { name: "Open a file" })).toBeTruthy();
@@ -734,8 +827,9 @@ describe("Markd shell", () => {
     });
 
     render(App);
-    expect(await screen.findByRole("heading", { name: "current.ts" }))
-      .toBeTruthy();
+    expect(
+      await screen.findByRole("textbox", { name: "Editing current.ts" }),
+    ).toBeTruthy();
     const handoff = vi.fn().mockResolvedValue(false);
     (window as Window & {
       markdBeforeWorkspaceSwitch?: () => Promise<boolean>;
@@ -745,7 +839,45 @@ describe("Markd shell", () => {
 
     expect(handoff).toHaveBeenCalledOnce();
     expect(openWorkspaceFile).not.toHaveBeenCalled();
-    expect(screen.getByRole("heading", { name: "current.ts" })).toBeTruthy();
+    expect(
+      screen.getByRole("textbox", { name: "Editing current.ts" }),
+    ).toBeTruthy();
+  });
+
+  it("surfaces a rejected file open through the error toast instead of doing nothing", async () => {
+    const openWorkspaceFile = vi.fn().mockRejectedValue(
+      new Error("The workspace path changed while opening."),
+    );
+    vi.stubGlobal("bindings", {
+      getAppInfo: vi.fn().mockResolvedValue({
+        name: "Markd",
+        platform: "darwin",
+        arch: "aarch64",
+        runtime: "Deno 2.9.0",
+      }),
+      getWorkspaceState: vi.fn().mockResolvedValue({
+        activePath: "/Users/example/Notes",
+        recentWorkspaces: ["/Users/example/Notes"],
+      }),
+      getWorkspaceNavigation: vi.fn().mockResolvedValue({
+        rootPath: "/Users/example/Notes",
+        entries: [{ kind: "file", name: "config.json", path: "config.json" }],
+        activeFile: null,
+      }),
+      openWorkspaceFile,
+      openFolder: vi.fn(),
+    });
+
+    render(App);
+    expect(await screen.findByRole("dialog", { name: "Open a file" }))
+      .toBeTruthy();
+    await fireEvent.click(
+      screen.getByRole("treeitem", { name: "config.json" }),
+    );
+
+    expect(openWorkspaceFile).toHaveBeenCalledWith("config.json");
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull();
   });
 
   it("shows the save failure toast and Retry saves the latest editor buffer", async () => {

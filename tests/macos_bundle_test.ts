@@ -31,3 +31,20 @@ Deno.test("macOS build seals the first-launch sentinel into the app", async () =
     throw new Error("The macOS build does not seal its first-launch sentinel");
   }
 });
+
+Deno.test("macOS build sets the application icon via deno desktop --icon", async () => {
+  const config = JSON.parse(await Deno.readTextFile("deno.json"));
+  const iconFlag = "--icon assets/icons/markd-icon.icns";
+
+  for (const task of ["dev", "build"]) {
+    const command = config.tasks?.[task];
+    if (typeof command !== "string" || !command.includes(iconFlag)) {
+      throw new Error(`The ${task} task does not set the application icon`);
+    }
+  }
+
+  const iconStat = await Deno.stat("assets/icons/markd-icon.icns");
+  if (!iconStat.isFile) {
+    throw new Error("The application icon asset is missing");
+  }
+});
