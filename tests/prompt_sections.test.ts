@@ -64,9 +64,59 @@ describe("prompt sections", () => {
       .toHaveLength(3);
     expect(editor.querySelectorAll("[data-prompt-boundary='close']"))
       .toHaveLength(3);
+    expect(editor.querySelector(".prompt-section-unwrap")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Unwrap/i })).toBeNull();
   });
 
-  it("preserves exact boundaries, synchronizes rename, and unwraps content", async () => {
+  it("collapsing an outer section hides its nested section without changing the nested section's own state", async () => {
+    const markdown = [
+      "<Outer>",
+      "Outer text",
+      "",
+      "<Inner>",
+      "Inner text",
+      "</Inner>",
+      "</Outer>",
+    ].join("\n");
+    render(MarkdownEditor, {
+      props: { path: "prompts/nested-collapse.md", content: markdown },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing prompts/nested-collapse.md",
+    });
+    await waitFor(() => {
+      expect(editor.querySelectorAll(".prompt-section")).toHaveLength(2);
+    });
+
+    const outerSection = [...editor.querySelectorAll(".prompt-section")].find(
+      (section) => (section as HTMLElement).dataset.promptName === "Outer",
+    ) as HTMLElement;
+    const innerSection = outerSection.querySelector(
+      ".prompt-section",
+    ) as HTMLElement;
+    const outerContent = outerSection.querySelector<HTMLElement>(
+      ".prompt-section-content",
+    )!;
+    const innerCollapseButton = screen.getByRole("button", {
+      name: "Collapse Inner prompt section",
+    });
+
+    await fireEvent.click(screen.getByRole("button", {
+      name: "Collapse Outer prompt section",
+    }));
+    expect(outerContent.style.display).toBe("none");
+    expect(innerSection.isConnected).toBe(true);
+    expect(innerCollapseButton.textContent).toBe("Collapse");
+    expect(innerCollapseButton.getAttribute("aria-expanded")).toBe("true");
+
+    await fireEvent.click(screen.getByRole("button", {
+      name: "Expand Outer prompt section",
+    }));
+    expect(outerContent.style.display).toBe("");
+    expect(innerCollapseButton.textContent).toBe("Collapse");
+  });
+
+  it("preserves exact boundaries, synchronizes rename, and collapses/expands content", async () => {
     const opening = "  <Task_Name role=\"user\" data-note='Keep Me'>  ";
     const closing = "  </Task_Name>  ";
     const markdown = [opening, "# Keep this", closing].join("\n");
@@ -89,10 +139,42 @@ describe("prompt sections", () => {
       expect(saved).toContain(closing);
     });
 
+    const closingBar = editor.querySelector(".prompt-section-closing")!;
+    expect(closingBar.textContent).toBe("");
+    expect(closingBar.querySelector("input")).toBeNull();
+
     const openingName = await screen.findByRole("textbox", {
-      name: "Rename opening Task_Name prompt section",
+      name: "Rename Task_Name prompt section",
+    }) as HTMLInputElement;
+    expect(openingName.value).toBe("Task_Name");
+    expect(openingName.closest(".prompt-section-opening")?.textContent).toBe(
+      "Collapse",
+    );
+
+    const section = editor.querySelector(".prompt-section")!;
+    const content = section.querySelector<HTMLElement>(
+      ".prompt-section-content",
+    )!;
+    const sectionClosingBar = section.querySelector<HTMLElement>(
+      ".prompt-section-closing",
+    )!;
+    const changesBeforeCollapse = view.emitted<string[]>("change").length;
+
+    const collapseButton = screen.getByRole("button", {
+      name: "Collapse Task_Name prompt section",
     });
-    await fireEvent.update(openingName, "Renamed.v2");
+    expect(collapseButton.getAttribute("aria-expanded")).toBe("true");
+    await fireEvent.click(collapseButton);
+    expect(content.style.display).toBe("none");
+    expect(sectionClosingBar.style.display).toBe("none");
+    expect(collapseButton.getAttribute("aria-expanded")).toBe("false");
+    expect(collapseButton.textContent).toBe("Expand");
+    expect(view.emitted<string[]>("change").length).toBe(changesBeforeCollapse);
+
+    await fireEvent.update(
+      screen.getByRole("textbox", { name: "Rename Task_Name prompt section" }),
+      "Renamed.v2",
+    );
     await waitFor(() => {
       const saved = view.emitted<string[]>("change").at(-1)?.[0] ?? "";
       expect(saved).toContain(
@@ -100,12 +182,26 @@ describe("prompt sections", () => {
       );
       expect(saved).toContain("  </Renamed.v2>  ");
       expect(saved).toContain("# Still here");
+      expect(saved).not.toContain("collapsed");
     });
-    const closingName = screen.getByRole("textbox", {
-      name: "Rename closing Renamed.v2 prompt section",
-    }) as HTMLInputElement;
-    expect(closingName.value).toBe("Renamed.v2");
-    await fireEvent.update(closingName, "Final_Name");
+    expect(content.style.display).toBe("none");
+    expect(sectionClosingBar.style.display).toBe("none");
+    const collapsedExpandButton = screen.getByRole("button", {
+      name: "Expand Renamed.v2 prompt section",
+    });
+
+    await fireEvent.click(collapsedExpandButton);
+    expect(content.style.display).toBe("");
+    expect(sectionClosingBar.style.display).toBe("");
+    expect(collapsedExpandButton.textContent).toBe("Collapse");
+    expect(collapsedExpandButton.getAttribute("aria-expanded")).toBe("true");
+
+    await fireEvent.update(
+      screen.getByRole("textbox", {
+        name: "Rename Renamed.v2 prompt section",
+      }),
+      "Final_Name",
+    );
     await waitFor(() => {
       const saved = view.emitted<string[]>("change").at(-1)?.[0] ?? "";
       expect(saved).toContain(
@@ -113,16 +209,7 @@ describe("prompt sections", () => {
       );
       expect(saved).toContain("  </Final_Name>  ");
     });
-
-    await fireEvent.click(screen.getByRole("button", {
-      name: "Remove Final_Name prompt section boundaries",
-    }));
-    await waitFor(() => {
-      expect(editor.querySelector(".prompt-section")).toBeNull();
-      const saved = view.emitted<string[]>("change").at(-1)?.[0] ?? "";
-      expect(saved).toContain("# Still here");
-      expect(saved).not.toContain("Final_Name");
-    });
+    expect(screen.queryByRole("button", { name: /Unwrap/i })).toBeNull();
   });
 
   it("retains structure and exact boundaries across a load-save-load cycle", async () => {
@@ -161,6 +248,33 @@ describe("prompt sections", () => {
       expect(secondEditor.querySelectorAll(".prompt-section")).toHaveLength(1);
     });
     expect(secondEditor.textContent).toContain("Updated text");
+  });
+
+  it("round-trips an attributed section byte-for-byte with no edits", async () => {
+    const source = [
+      '<task priority="high">',
+      "",
+      "Do the thing",
+      "",
+      "</task>",
+      "",
+    ].join("\n");
+    const host = document.createElement("div");
+    document.body.append(host);
+    const crepe = new Crepe({ root: host, defaultValue: source });
+    crepe.addFeature(promptSectionsFeature);
+    await crepe.create();
+
+    expect(crepe.getMarkdown()).toBe(source);
+    expect(host.querySelector(".prompt-section")).toBeTruthy();
+    const openingBar = host.querySelector(".prompt-section-opening")!;
+    expect(openingBar.querySelector("input")?.value).toBe("task");
+    expect(openingBar.textContent).toBe("Collapse");
+    const closingBar = host.querySelector(".prompt-section-closing")!;
+    expect(closingBar.textContent).toBe("");
+    expect(closingBar.querySelector("input")).toBeNull();
+
+    await crepe.destroy();
   });
 
   it("preserves adversarial marker-like comments exactly across load-save-load", async () => {
@@ -554,7 +668,7 @@ describe("prompt sections", () => {
       name: "Editing prompts/invalidate.md",
     });
     const openingName = await screen.findByRole("textbox", {
-      name: "Rename opening Valid prompt section",
+      name: "Rename Valid prompt section",
     });
     await fireEvent.update(openingName, "not valid");
     await waitFor(() => {

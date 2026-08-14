@@ -648,6 +648,42 @@ function paragraphForBoundary(
   return paragraph.create(null, html.create({ value: raw }));
 }
 
+export interface CollapseToggle {
+  button: HTMLButtonElement;
+  isCollapsed: () => boolean;
+  refresh: () => void;
+}
+
+export function createCollapseToggle(options: {
+  initiallyCollapsed: boolean;
+  labelFor: (collapsed: boolean) => string;
+  elementsToHide: HTMLElement[];
+  onToggle?: (collapsed: boolean) => void;
+}): CollapseToggle {
+  const button = document.createElement("button");
+  button.className = "prompt-section-collapse";
+  button.type = "button";
+
+  let collapsed = options.initiallyCollapsed;
+  const apply = (): void => {
+    button.textContent = collapsed ? "Expand" : "Collapse";
+    button.setAttribute("aria-expanded", String(!collapsed));
+    button.setAttribute("aria-label", options.labelFor(collapsed));
+    for (const element of options.elementsToHide) {
+      element.style.display = collapsed ? "none" : "";
+    }
+    options.onToggle?.(collapsed);
+  };
+
+  button.addEventListener("click", () => {
+    collapsed = !collapsed;
+    apply();
+  });
+  apply();
+
+  return { button, isCollapsed: () => collapsed, refresh: apply };
+}
+
 function promptSectionNodeView(
   node: ProseNode,
   view: EditorView,
@@ -661,79 +697,48 @@ function promptSectionNodeView(
   opening.className = "prompt-section-boundary prompt-section-opening";
   opening.dataset.promptBoundary = "open";
   opening.contentEditable = "false";
-  const openingKind = document.createElement("span");
-  openingKind.className = "prompt-section-kind";
-  openingKind.textContent = "Prompt section";
-  const openingMarker = document.createElement("span");
-  openingMarker.className = "prompt-section-marker";
-  openingMarker.textContent = "<";
   const openingInput = document.createElement("input");
   openingInput.className = "prompt-section-name";
   openingInput.type = "text";
   openingInput.autocomplete = "off";
   openingInput.spellcheck = false;
-  const openingSuffix = document.createElement("span");
-  openingSuffix.className = "prompt-section-suffix";
-  const unwrap = document.createElement("button");
-  unwrap.className = "prompt-section-unwrap";
-  unwrap.type = "button";
-  unwrap.textContent = "Unwrap";
-  opening.append(
-    openingKind,
-    openingMarker,
-    openingInput,
-    openingSuffix,
-    unwrap,
-  );
 
   const contentDOM = document.createElement("div");
   contentDOM.className = "prompt-section-content";
+  contentDOM.id = `prompt-section-content-${crypto.randomUUID()}`;
 
   const closing = document.createElement("div");
   closing.className = "prompt-section-boundary prompt-section-closing";
   closing.dataset.promptBoundary = "close";
   closing.contentEditable = "false";
-  const closingKind = document.createElement("span");
-  closingKind.className = "prompt-section-kind";
-  closingKind.textContent = "End section";
-  const closingMarker = document.createElement("span");
-  closingMarker.className = "prompt-section-marker";
-  closingMarker.textContent = "</";
-  const closingInput = document.createElement("input");
-  closingInput.className = "prompt-section-name";
-  closingInput.type = "text";
-  closingInput.autocomplete = "off";
-  closingInput.spellcheck = false;
-  const closingSuffix = document.createElement("span");
-  closingSuffix.className = "prompt-section-suffix";
-  closing.append(closingKind, closingMarker, closingInput, closingSuffix);
-  dom.append(opening, contentDOM, closing);
 
   let currentNode = node;
+  const collapseToggle = createCollapseToggle({
+    initiallyCollapsed: false,
+    labelFor: (collapsed) =>
+      `${collapsed ? "Expand" : "Collapse"} ${
+        (currentNode.attrs as PromptSectionAttrs).name
+      } prompt section`,
+    elementsToHide: [contentDOM, closing],
+    onToggle: (collapsed) => {
+      dom.dataset.promptCollapsed = String(collapsed);
+    },
+  });
+  collapseToggle.button.setAttribute("aria-controls", contentDOM.id);
+  opening.append(openingInput, collapseToggle.button);
+  dom.append(opening, contentDOM, closing);
+
   const render = (): void => {
     const attrs = currentNode.attrs as PromptSectionAttrs;
     dom.dataset.promptName = attrs.name;
     openingInput.value = attrs.name;
-    closingInput.value = attrs.name;
     const nameWidth = `${Math.min(40, Math.max(7, attrs.name.length + 1))}ch`;
     openingInput.style.width = nameWidth;
-    closingInput.style.width = nameWidth;
     openingInput.setAttribute(
       "aria-label",
-      `Rename opening ${attrs.name} prompt section`,
+      `Rename ${attrs.name} prompt section`,
     );
-    closingInput.setAttribute(
-      "aria-label",
-      `Rename closing ${attrs.name} prompt section`,
-    );
-    unwrap.setAttribute(
-      "aria-label",
-      `Remove ${attrs.name} prompt section boundaries`,
-    );
-    const openNameEnd = attrs.openRaw.indexOf(attrs.name) + attrs.name.length;
-    const closeNameEnd = attrs.closeRaw.indexOf(attrs.name) + attrs.name.length;
-    openingSuffix.textContent = attrs.openRaw.slice(openNameEnd).trimEnd();
-    closingSuffix.textContent = attrs.closeRaw.slice(closeNameEnd).trimEnd();
+    collapseToggle.refresh();
   };
 
   const rename = (name: string): void => {
@@ -764,18 +769,6 @@ function promptSectionNodeView(
     );
   };
   openingInput.addEventListener("input", () => rename(openingInput.value));
-  closingInput.addEventListener("input", () => rename(closingInput.value));
-  unwrap.addEventListener("click", () => {
-    const position = getPos();
-    if (position === undefined) return;
-    view.dispatch(
-      view.state.tr.replaceWith(
-        position,
-        position + currentNode.nodeSize,
-        currentNode.content,
-      ),
-    );
-  });
   render();
 
   return {
@@ -792,7 +785,9 @@ function promptSectionNodeView(
       closing.contains(event.target as Node),
     ignoreMutation: (mutation) =>
       opening.contains(mutation.target) ||
-      closing.contains(mutation.target),
+      closing.contains(mutation.target) ||
+      (mutation.type === "attributes" &&
+        (mutation.target === contentDOM || mutation.target === dom)),
   };
 }
 
