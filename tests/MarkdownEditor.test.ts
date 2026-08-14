@@ -38,6 +38,7 @@ vi.mock("@milkdown/crepe", () => {
   class Crepe {
     static Feature = {
       AI: "ai",
+      BlockEdit: "block-edit",
       ImageBlock: "image-block",
       LinkTooltip: "link-tooltip",
       Toolbar: "toolbar",
@@ -120,10 +121,11 @@ describe("MarkdownEditor", () => {
     expect(instance.config.defaultValue).toBe(markdown);
     expect(instance.config.features).toMatchObject({
       ai: false,
+      "block-edit": false,
       "image-block": true,
       "link-tooltip": true,
       toolbar: false,
-      "top-bar": false,
+      "top-bar": true,
     });
     const imageConfig = instance.config.featureConfigs?.["image-block"];
     expect(
@@ -144,6 +146,37 @@ describe("MarkdownEditor", () => {
     expect(view.emitted("change")).toBeUndefined();
     instance.markdownUpdated?.({}, serialized, markdown);
     expect(view.emitted("change")).toEqual([[serialized]]);
+  });
+
+  it("configures the top bar to drop only the math item via buildTopBar", async () => {
+    render(MarkdownEditor, {
+      props: { path: "notes/topbar.md", content: "# Heading" },
+    });
+    await waitFor(() => expect(crepeState.instances).toHaveLength(1));
+    const instance = crepeState.instances[0]!;
+    const buildTopBar = instance.config.featureConfigs?.["top-bar"]
+      ?.buildTopBar as (builder: {
+        getGroup: (key: string) => { group: { items: { key: string }[] } };
+      }) => void;
+    expect(buildTopBar).toBeInstanceOf(Function);
+
+    const blockGroup = {
+      group: { items: [{ key: "code-block" }, { key: "math" }] },
+    };
+    const otherGroup = {
+      group: { items: [{ key: "quote" }, { key: "hr" }] },
+    };
+    buildTopBar({
+      getGroup: (key) => (key === "block" ? blockGroup : otherGroup),
+    });
+
+    expect(blockGroup.group.items.map((item) => item.key)).toEqual([
+      "code-block",
+    ]);
+    expect(otherGroup.group.items.map((item) => item.key)).toEqual([
+      "quote",
+      "hr",
+    ]);
   });
 
   it("replaces external content without emitting an edit and destroys each instance once", async () => {

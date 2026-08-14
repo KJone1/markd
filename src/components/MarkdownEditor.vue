@@ -5,9 +5,17 @@ import "@milkdown/crepe/theme/frame.css";
 import { replaceAll } from "@milkdown/kit/utils";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
+  frontmatterFeature,
+  prepareFrontmatterMarkdown,
+} from "../editor/frontmatter.ts";
+import {
   preparePromptSectionMarkdown,
   promptSectionsFeature,
 } from "../editor/prompt-sections.ts";
+
+function prepareMarkdown(markdown: string): string {
+  return preparePromptSectionMarkdown(prepareFrontmatterMarkdown(markdown));
+}
 
 const props = defineProps<{
   path: string;
@@ -153,6 +161,19 @@ function labelEditorControls(): void {
     ["[data-role='row-drag-handle'] button", "Delete row", "pointerdown"],
     ["[data-role='x-line-drag-handle'] button", "Add row", "pointerdown"],
     ["[data-role='y-line-drag-handle'] button", "Add column", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(1)", "Bold", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(2)", "Italic", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(3)", "Strikethrough", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(4)", "Inline code", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(5)", "Bullet list", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(6)", "Ordered list", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(7)", "Task list", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(8)", "Insert link", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(9)", "Insert image", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(10)", "Insert table", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(11)", "Code block", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(12)", "Quote", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(13)", "Divider", "pointerdown"],
   ] as const;
   for (const [selector, label, activationEvent] of controlLabels) {
     host.value?.querySelectorAll<HTMLElement>(selector).forEach((control) => {
@@ -220,10 +241,11 @@ onMounted(async () => {
     defaultValue: props.content,
     features: {
       [Crepe.Feature.AI]: false,
+      [Crepe.Feature.BlockEdit]: false,
       [Crepe.Feature.ImageBlock]: true,
       [Crepe.Feature.LinkTooltip]: true,
       [Crepe.Feature.Toolbar]: false,
-      [Crepe.Feature.TopBar]: false,
+      [Crepe.Feature.TopBar]: true,
     },
     featureConfigs: {
       [Crepe.Feature.ImageBlock]: {
@@ -233,8 +255,17 @@ onMounted(async () => {
         blockOnUpload: () =>
           Promise.reject(new Error("File upload is unavailable")),
       },
+      [Crepe.Feature.TopBar]: {
+        buildTopBar: (builder) => {
+          const block = builder.getGroup("block");
+          block.group.items = block.group.items.filter(
+            (item) => item.key !== "math",
+          );
+        },
+      },
     },
   });
+  instance.addFeature(frontmatterFeature);
   instance.addFeature(promptSectionsFeature);
   crepe = instance;
   instance.on((listener) => {
@@ -268,7 +299,7 @@ onMounted(async () => {
   );
   if (instance.getMarkdown() !== props.content) {
     applyingExternalChange = true;
-    instance.editor.action(replaceAll(preparePromptSectionMarkdown(props.content)));
+    instance.editor.action(replaceAll(prepareMarkdown(props.content)));
     applyingExternalChange = false;
   }
 });
@@ -278,7 +309,7 @@ watch(() => props.content, (content) => {
     return;
   }
   applyingExternalChange = true;
-  crepe.editor.action(replaceAll(preparePromptSectionMarkdown(content)));
+  crepe.editor.action(replaceAll(prepareMarkdown(content)));
   applyingExternalChange = false;
 });
 
