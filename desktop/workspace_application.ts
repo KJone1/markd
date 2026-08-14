@@ -24,7 +24,7 @@ import {
 export interface WorkspaceWindow {
   setApplicationMenu(menu: ApplicationMenuItem[]): void;
   addEventListener(
-    type: "menuclick",
+    type: "menuclick" | "close",
     listener: (event: Event & { detail?: { id?: string } }) => void,
   ): void;
   executeJs(source: string): Promise<unknown>;

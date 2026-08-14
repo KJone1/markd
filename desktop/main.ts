@@ -25,6 +25,8 @@ if (desktopRuntime.BrowserWindow) {
     height: 760,
   }) as unknown as DesktopBrowserWindow;
 
+  window.addEventListener("close", () => Deno.exit(0));
+
   const home = Deno.env.get("HOME");
   if (home === undefined) throw new Error("HOME is unavailable");
   const workspace = new WorkspaceApplication(
