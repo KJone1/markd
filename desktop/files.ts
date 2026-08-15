@@ -6,8 +6,31 @@ const EXCLUDED_DIRECTORIES = new Set([
   ".git",
   "node_modules",
   ".deno",
+  ".venv",
+  ".idea",
+  ".vscode",
+  ".cache",
+  ".next",
+  "coverage",
   "dist",
   "build",
+]);
+
+const EXCLUDED_FILES = new Set([
+  ".DS_Store",
+  "Thumbs.db",
+  "desktop.ini",
+  "Cargo.lock",
+  "Gemfile.lock",
+  "bun.lockb",
+  "composer.lock",
+  "deno.lock",
+  "go.sum",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "poetry.lock",
+  "uv.lock",
+  "yarn.lock",
 ]);
 
 const MAX_TEXT_FILE_BYTES = 10 * 1024 * 1024;
@@ -205,6 +228,7 @@ export class WorkspaceFiles {
     for (const entry of directoryEntries) {
       if (entry.name === "." || entry.name === "..") continue;
       if (entry.name.startsWith(".markd-save-")) continue;
+      if (EXCLUDED_FILES.has(entry.name)) continue;
       const relativePath = directory === ""
         ? entry.name
         : `${directory}/${entry.name}`;

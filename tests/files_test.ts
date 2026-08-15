@@ -9,8 +9,15 @@ Deno.test("workspace index is hierarchical and skips generated or unsafe paths",
     await Deno.mkdir(`${rootPath}/notes`, { recursive: true });
     await Deno.mkdir(`${rootPath}/node_modules`);
     await Deno.mkdir(`${rootPath}/dist`);
+    await Deno.mkdir(`${rootPath}/.vscode`);
     await Deno.mkdir(outsidePath);
     await Deno.writeTextFile(`${rootPath}/.env`, "visible");
+    await Deno.writeTextFile(`${rootPath}/.gitignore`, "visible");
+    await Deno.writeTextFile(`${rootPath}/.DS_Store`, "hidden");
+    await Deno.writeTextFile(`${rootPath}/package-lock.json`, "hidden");
+    await Deno.writeTextFile(`${rootPath}/deno.lock`, "hidden");
+    await Deno.writeTextFile(`${rootPath}/.vscode/settings.json`, "hidden");
+    await Deno.writeTextFile(`${rootPath}/notes/.DS_Store`, "hidden");
     await Deno.writeTextFile(`${rootPath}/notes/today.md`, "# Today");
     await Deno.writeTextFile(`${rootPath}/node_modules/package.js`, "hidden");
     await Deno.writeTextFile(`${rootPath}/dist/output.js`, "hidden");
@@ -24,6 +31,7 @@ Deno.test("workspace index is hierarchical and skips generated or unsafe paths",
 
     assertEquals(index, [
       { kind: "file", name: ".env", path: ".env" },
+      { kind: "file", name: ".gitignore", path: ".gitignore" },
       {
         kind: "directory",
         name: "notes",
