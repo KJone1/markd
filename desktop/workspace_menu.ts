@@ -32,14 +32,6 @@ export function buildApplicationMenu(
       submenu: {
         label: "Markd",
         items: [
-          { role: { role: "quit" } },
-        ],
-      },
-    },
-    {
-      submenu: {
-        label: "File",
-        items: [
           {
             item: {
               label: "Open Folder...",
@@ -65,6 +57,7 @@ export function buildApplicationMenu(
           },
           "separator",
           { role: { role: "close" } },
+          { role: { role: "quit" } },
         ],
       },
     },
