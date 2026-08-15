@@ -31,6 +31,11 @@ onMounted(() => {
   changeSubscription = editor.onDidChangeModelContent(() => {
     if (!applyingExternalChange) emit("change", editor!.getValue());
   });
+  // Monaco measures character width on create, before the webfont has
+  // swapped in - without this the cursor sits off the glyphs.
+  document.fonts?.ready.then(() => {
+    if (editor !== null) monaco.editor.remeasureFonts();
+  });
 });
 
 watch(() => props.content, (content) => {

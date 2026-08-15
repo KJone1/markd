@@ -1,3 +1,51 @@
+@font-face {
+  font-family: "Cal Sans";
+  src: url("../assets/fonts/CalSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cal Sans";
+  src: url("../assets/fonts/CalSans-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cal Sans";
+  src: url("../assets/fonts/CalSans-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cal Sans";
+  src: url("../assets/fonts/CalSans-BoldItalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../assets/fonts/JetBrainsMono-Variable.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../assets/fonts/JetBrainsMono-Italic-Variable.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #334155;
@@ -146,7 +194,8 @@ button {
   text-transform: uppercase;
 }
 
-h1 {
+.welcome-card h1,
+.document-title {
   max-width: 680px;
   margin: 0;
   color: var(--color-ink);
@@ -210,7 +259,9 @@ h1 {
   font-weight: 700;
 }
 
-h2 {
+.status-card h2,
+.conflict-dialog h2,
+.tree-dialog-header h2 {
   margin: 2px 0 4px;
   color: var(--color-ink);
   font-size: 18px;
@@ -272,7 +323,7 @@ h2 {
   --crepe-color-selected: #bfdbfe;
   --crepe-color-inline-area: var(--color-hairline);
   --crepe-font-title: "Cal Sans", Inter, -apple-system, BlinkMacSystemFont, sans-serif;
-  --crepe-font-default: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --crepe-font-default: "Cal Sans", Inter, -apple-system, BlinkMacSystemFont, sans-serif;
   --crepe-font-code: "JetBrains Mono", ui-monospace, monospace;
   --crepe-shadow-1: 0 4px 12px rgb(15 23 42 / 8%);
   --crepe-shadow-2: 0 10px 15px -3px rgb(15 23 42 / 12%);
@@ -323,7 +374,6 @@ h2 {
 }
 
 .markdown-editor .milkdown .ProseMirror h3 {
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 22px;
   line-height: 1.3;
   letter-spacing: -0.3px;
@@ -332,7 +382,6 @@ h2 {
 .markdown-editor .milkdown .ProseMirror h4,
 .markdown-editor .milkdown .ProseMirror h5,
 .markdown-editor .milkdown .ProseMirror h6 {
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 18px;
   line-height: 1.4;
   letter-spacing: 0;
@@ -455,6 +504,42 @@ h2 {
 .markdown-editor .prompt-section[data-prompt-collapsed="true"] > .prompt-section-content,
 .markdown-editor .prompt-section[data-prompt-collapsed="true"] > .prompt-section-closing {
   display: none;
+}
+
+.markdown-editor .html-block {
+  margin: var(--space-md) 0;
+}
+
+.markdown-editor .html-block img {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-editor .html-block-source {
+  margin: 0;
+  padding: var(--space-xs) var(--space-md);
+  color: var(--color-muted);
+  background: var(--color-hairline-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.markdown-editor .html-section {
+  margin: var(--space-md) 0;
+}
+
+.markdown-editor .html-section[align="center"],
+.markdown-editor .html-block-rendered [align="center"] {
+  text-align: center;
+}
+
+.markdown-editor .html-section[align="right"],
+.markdown-editor .html-block-rendered [align="right"] {
+  text-align: right;
 }
 
 .markdown-editor .frontmatter-label {
