@@ -1,6 +1,16 @@
-# markd
+<p align="center">
 
-A minimalist local editor built because existing markdown tools fail to cleanly handle markdown made for LLMs like skills.
+  <img src="assets/icons/markd-icon-1024.png" alt="markd" width="128" />
+
+</p>
+
+<h1 align="center">markd</h1>
+
+<p align="center">
+
+A minimalist local editor built because existing markdown tools fail to cleanly handle LLM-facing markdown such as Agent Skills.
+
+</p>
 
 ## Features
 
@@ -14,4 +24,3 @@ A minimalist local editor built because existing markdown tools fail to cleanly 
 ```bash
 just run
 ```
-
