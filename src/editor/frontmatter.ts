@@ -30,11 +30,13 @@ const MARKER = /^<!--markd-frontmatter:([a-f\d-]+)-(\d+)-->$/;
 const markerSecret = crypto.randomUUID();
 let markerSequence = 0;
 const markers = new Map<string, FrontmatterMarker>();
+const markerSources = new Map<string, string>();
 
 function registerMarker(marker: FrontmatterMarker): string {
   const id = `${markerSecret}-${markerSequence}`;
   markerSequence += 1;
   markers.set(id, marker);
+  markerSources.set(id, marker.raw);
   return `<!--markd-frontmatter:${id}-->`;
 }
 
@@ -106,6 +108,14 @@ export function prepareFrontmatterMarkdown(markdown: string): string {
     entries: parseFrontmatterEntries(content),
   });
   return [marker, ...lines.slice(closingIndex + 1)].join("\n");
+}
+
+export function restoreFrontmatterSources(markdown: string): string {
+  return markdown.replaceAll(
+    new RegExp(`<!--markd-frontmatter:${markerSecret}-(\\d+)-->`, "g"),
+    (marker, sequence: string) =>
+      markerSources.get(`${markerSecret}-${sequence}`) ?? marker,
+  );
 }
 
 function markerValueFromNode(node: MarkdownNode): string | undefined {
@@ -256,7 +266,10 @@ function frontmatterNodeView(
   };
 }
 
-const frontmatterView = $view(frontmatterSchema.node, () => frontmatterNodeView);
+const frontmatterView = $view(
+  frontmatterSchema.node,
+  () => frontmatterNodeView,
+);
 
 export function frontmatterFeature(editor: Editor): void {
   editor.config((ctx) => {

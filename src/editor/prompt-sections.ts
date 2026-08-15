@@ -16,6 +16,11 @@ import {
   paragraphSchema,
 } from "@milkdown/kit/preset/commonmark";
 import { $nodeSchema, $prose, $remark, $view } from "@milkdown/kit/utils";
+import {
+  htmlBlockSchema,
+  htmlSectionSchema,
+  isRenderableHtmlTag,
+} from "./html.ts";
 
 const NAME_SOURCE = "[A-Za-z_][A-Za-z0-9_.:-]*";
 const ATTRIBUTE_SOURCE =
@@ -27,6 +32,7 @@ const CLOSING = new RegExp(`^(\\s*)</(${NAME_SOURCE})\\s*>(\\s*)$`);
 const ATTRIBUTES = new RegExp(`^${ATTRIBUTE_SOURCE}$`);
 const INTERNAL_MARKER = /^<!--markd-internal:([a-f\d-]+)-(\d+)-->$/;
 const INTERNAL_MARKER_EMBEDDED = /<!--markd-internal:[a-f\d-]+-\d+-->/g;
+const INTERNAL_MARKER_SPLIT = /(<!--markd-internal:[a-f\d-]+-\d+-->)/;
 const markerSecret = crypto.randomUUID();
 let markerSequence = 0;
 
@@ -36,6 +42,7 @@ interface PromptBoundary {
   kind: BoundaryKind;
   name: string;
   raw: string;
+  html: boolean;
 }
 
 interface MarkdownNode {
@@ -77,11 +84,13 @@ type InternalMarker =
   | PromptParagraphMarker;
 
 const internalMarkers = new Map<string, InternalMarker>();
+const markerSources = new Map<string, string>();
 
-function registerMarker(marker: InternalMarker): string {
+function registerMarker(marker: InternalMarker, source = ""): string {
   const id = `${markerSecret}-${markerSequence}`;
   markerSequence += 1;
   internalMarkers.set(id, marker);
+  markerSources.set(id, source);
   return `<!--markd-internal:${id}-->`;
 }
 
@@ -101,12 +110,14 @@ function resolveMarker(value: string): InternalMarker | null {
 function parseBoundary(raw: string): PromptBoundary | null {
   const closing = CLOSING.exec(raw);
   if (closing !== null) {
-    return { kind: "close", name: closing[2]!, raw };
+    const name = closing[2]!;
+    return { kind: "close", name, raw, html: isRenderableHtmlTag(name) };
   }
 
   const opening = OPENING.exec(raw);
   if (opening === null || !ATTRIBUTES.test(opening[3]!)) return null;
-  return { kind: "open", name: opening[2]!, raw };
+  const name = opening[2]!;
+  return { kind: "open", name, raw, html: isRenderableHtmlTag(name) };
 }
 
 interface CodeFence {
@@ -237,8 +248,101 @@ export function preparePromptSectionMarkdown(markdown: string): string {
     const codeMarker = codeMarkers.get(index);
     if (codeMarker !== undefined) return codeMarker;
     const boundary = valid.get(index);
-    return boundary === undefined ? line : registerMarker(boundary);
+    return boundary === undefined ? line : registerMarker(boundary, line);
   }).join("\n");
+}
+
+export function restoreMarkerSources(markdown: string): string {
+  return markdown.replaceAll(
+    new RegExp(`<!--markd-internal:${markerSecret}-(\\d+)-->`, "g"),
+    (marker, sequence: string) =>
+      markerSources.get(`${markerSecret}-${sequence}`) ?? marker,
+  );
+}
+
+function boundaryFromValue(value: string): PromptBoundary | null {
+  const marker = resolveMarker(value);
+  return marker?.kind === "open" || marker?.kind === "close" ? marker : null;
+}
+
+function isRawHtmlNode(node: MarkdownNode): boolean {
+  return node.type === "html" || node.type === "htmlBlock";
+}
+
+function splitEmbeddedValue(node: MarkdownNode): MarkdownNode[] | null {
+  const value = node.value;
+  if (!isRawHtmlNode(node) || typeof value !== "string") return null;
+  const pieces = value.split(INTERNAL_MARKER_SPLIT);
+  if (
+    pieces.length < 2 ||
+    !pieces.some((piece) => boundaryFromValue(piece) !== null)
+  ) return null;
+
+  const result: MarkdownNode[] = [];
+  for (const piece of pieces) {
+    if (boundaryFromValue(piece) !== null) {
+      result.push({ type: "html", value: piece });
+      continue;
+    }
+    const trimmed = piece.replace(/^\n+|\n+$/g, "");
+    if (trimmed.trim() === "") continue;
+    result.push({ ...node, value: trimmed, position: undefined });
+  }
+  return result;
+}
+
+function splitInlineBoundaries(node: MarkdownNode): MarkdownNode[] | null {
+  const children = node.children;
+  if (node.type !== "paragraph" || children === undefined) return null;
+  if (children.length < 2) return null;
+  if (
+    !children.some((child) =>
+      typeof child.value === "string" && boundaryFromValue(child.value) !== null
+    )
+  ) return null;
+
+  const result: MarkdownNode[] = [];
+  let buffer: MarkdownNode[] = [];
+  const flush = (): void => {
+    if (
+      buffer.some((child) =>
+        child.children !== undefined ||
+        (typeof child.value === "string" && child.value.trim() !== "")
+      )
+    ) result.push({ ...node, children: buffer, position: undefined });
+    buffer = [];
+  };
+  for (const child of children) {
+    const value = typeof child.value === "string" ? child.value : "";
+    if (boundaryFromValue(value) === null) {
+      buffer.push(child);
+      continue;
+    }
+    flush();
+    result.push({ type: "html", value });
+  }
+  flush();
+  return result;
+}
+
+function splitBoundaryMarkers(node: MarkdownNode): void {
+  const children = node.children;
+  if (children === undefined) return;
+  const expanded = children.flatMap((child) =>
+    splitEmbeddedValue(child) ?? [child]
+  );
+  expanded.forEach(splitBoundaryMarkers);
+  node.children = expanded.flatMap((child) =>
+    splitInlineBoundaries(child) ?? [child]
+  );
+}
+
+function restoreBoundaryText(
+  node: MarkdownNode,
+  boundary: PromptBoundary,
+): void {
+  const target = isRawHtmlNode(node) ? node : node.children?.[0];
+  if (target !== undefined) target.value = boundary.raw;
 }
 
 function sentinelFromNode(node: MarkdownNode): PromptBoundary | null {
@@ -249,9 +353,7 @@ function sentinelFromNode(node: MarkdownNode): PromptBoundary | null {
     node.children[0]?.type === "html"
   ) value = node.children[0].value;
   if (value === undefined) return null;
-
-  const marker = resolveMarker(value);
-  return marker?.kind === "open" || marker?.kind === "close" ? marker : null;
+  return boundaryFromValue(value);
 }
 
 function extractMarkers(
@@ -337,6 +439,7 @@ function groupPromptSections(children: MarkdownNode[]): MarkdownNode[] {
       if (child.children !== undefined) {
         child.children = groupPromptSections(child.children);
       }
+      if (opening !== null) restoreBoundaryText(child, opening);
       result.push(child);
       continue;
     }
@@ -360,12 +463,13 @@ function groupPromptSections(children: MarkdownNode[]): MarkdownNode[] {
       }
     }
     if (closingIndex < 0 || closing === null) {
+      restoreBoundaryText(child, opening);
       result.push(child);
       continue;
     }
 
     result.push({
-      type: "promptSection",
+      type: opening.html ? "htmlSection" : "promptSection",
       name: opening.name,
       openRaw: opening.raw,
       closeRaw: closing.raw,
@@ -381,6 +485,7 @@ const promptSectionRemark = $remark(
   () => () => (tree) => {
     const markdownTree = tree as unknown as MarkdownNode;
     restoreInternalMarkers(markdownTree);
+    splitBoundaryMarkers(markdownTree);
     if (markdownTree.children !== undefined) {
       markdownTree.children = groupPromptSections(markdownTree.children);
     }
@@ -816,8 +921,9 @@ function conversionTransaction(
   doc: ProseNode,
   view: EditorView,
 ) {
-  const type = view.state.schema.nodes.prompt_section;
-  if (type === undefined) return null;
+  const promptType = view.state.schema.nodes.prompt_section;
+  if (promptType === undefined) return null;
+  const htmlType = view.state.schema.nodes.html_section ?? promptType;
   let transaction = view.state.tr;
   let changed = false;
 
@@ -869,7 +975,7 @@ function conversionTransaction(
       transaction = transaction.replaceWith(
         start,
         end,
-        type.create({
+        (pair.opening.html ? htmlType : promptType).create({
           name: pair.opening.name,
           openRaw: pair.opening.raw,
           closeRaw: pair.closing.raw,
@@ -880,7 +986,10 @@ function conversionTransaction(
 
     if (changed) return;
     parent.forEach((child, offset) => {
-      if (child.type.name === "prompt_section") {
+      if (
+        child.type.name === "prompt_section" ||
+        child.type.name === "html_section"
+      ) {
         visit(child, contentStart + offset + 1);
       }
     });
@@ -974,5 +1083,7 @@ export function promptSectionsFeature(editor: Editor): void {
     promptSectionSchema,
     promptSectionView,
     promptSectionEditing,
+    htmlBlockSchema,
+    htmlSectionSchema,
   ].flat());
 }

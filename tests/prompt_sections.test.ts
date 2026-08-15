@@ -9,7 +9,15 @@ import { Crepe } from "@milkdown/crepe";
 import axe from "axe-core";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import MarkdownEditor from "../src/components/MarkdownEditor.vue";
-import { promptSectionsFeature } from "../src/editor/prompt-sections.ts";
+import {
+  preparePromptSectionMarkdown,
+  promptSectionsFeature,
+  restoreMarkerSources,
+} from "../src/editor/prompt-sections.ts";
+import {
+  prepareFrontmatterMarkdown,
+  restoreFrontmatterSources,
+} from "../src/editor/frontmatter.ts";
 
 beforeAll(() => {
   class Observer {
@@ -27,6 +35,32 @@ afterEach(() => {
 });
 
 describe("prompt sections", () => {
+  it.each([
+    ["prompt boundaries", ["<Task>", "Body", "</Task>", ""].join("\n")],
+    [
+      "html boundaries",
+      ['<p align="center">', "  Body", "</p>", ""].join("\n"),
+    ],
+    [
+      "code that looks like boundaries",
+      ["    <Indented>", "    literal", "    </Indented>", ""].join("\n"),
+    ],
+  ])(
+    "restores every internal marker to its source line for %s",
+    (_name, source) => {
+      const prepared = preparePromptSectionMarkdown(source);
+      expect(prepared).toContain("markd-internal:");
+      expect(restoreMarkerSources(prepared)).toBe(source);
+    },
+  );
+
+  it("restores the frontmatter marker to its source block", () => {
+    const source = ["---", "title: Example", "---", "", "Body", ""].join("\n");
+    const prepared = prepareFrontmatterMarkdown(source);
+    expect(prepared).toContain("markd-frontmatter:");
+    expect(restoreFrontmatterSources(prepared)).toBe(source);
+  });
+
   it("renders arbitrary, attributed, sibling, and nested paired sections", async () => {
     const markdown = [
       "<System-Prompt role=\"system\" data-kind='base'>",

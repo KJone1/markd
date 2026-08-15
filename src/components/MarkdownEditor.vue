@@ -7,14 +7,22 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   frontmatterFeature,
   prepareFrontmatterMarkdown,
+  restoreFrontmatterSources,
 } from "../editor/frontmatter.ts";
 import {
   preparePromptSectionMarkdown,
   promptSectionsFeature,
+  restoreMarkerSources,
 } from "../editor/prompt-sections.ts";
+import { createHtmlFeature } from "../editor/html.ts";
 
 function prepareMarkdown(markdown: string): string {
   return preparePromptSectionMarkdown(prepareFrontmatterMarkdown(markdown));
+}
+
+function savedMarkdown(markdown: string): string {
+  return restoreFrontmatterSources(restoreMarkerSources(markdown))
+    .replace(/\n{2,}$/, "\n");
 }
 
 const props = defineProps<{
@@ -267,11 +275,15 @@ onMounted(async () => {
   });
   instance.addFeature(frontmatterFeature);
   instance.addFeature(promptSectionsFeature);
+  instance.addFeature(createHtmlFeature({
+    resolveImage: (path) => props.resolveImage?.(path),
+  }));
   crepe = instance;
   instance.on((listener) => {
-    listener.markdownUpdated((_context, markdown, previousMarkdown) => {
+    listener.markdownUpdated((_context, rawMarkdown, previousMarkdown) => {
+      const markdown = savedMarkdown(rawMarkdown);
       if (
-        applyingExternalChange || markdown === previousMarkdown ||
+        applyingExternalChange || rawMarkdown === previousMarkdown ||
         markdown === props.content || markdown.includes("](blob:")
       ) return;
       emit("change", markdown);
@@ -297,7 +309,7 @@ onMounted(async () => {
     preventEphemeralImageConfirmation,
     true,
   );
-  if (instance.getMarkdown() !== props.content) {
+  if (savedMarkdown(instance.getMarkdown()) !== props.content) {
     applyingExternalChange = true;
     instance.editor.action(replaceAll(prepareMarkdown(props.content)));
     applyingExternalChange = false;
@@ -305,7 +317,10 @@ onMounted(async () => {
 });
 
 watch(() => props.content, (content) => {
-  if (!createFinished || crepe === null || crepe.getMarkdown() === content) {
+  if (
+    !createFinished || crepe === null ||
+    savedMarkdown(crepe.getMarkdown()) === content
+  ) {
     return;
   }
   applyingExternalChange = true;
