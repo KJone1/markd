@@ -64,6 +64,30 @@ Deno.test("the last active file is remembered independently for each workspace",
   }
 });
 
+Deno.test("concurrent windows writing settings keep every update", async () => {
+  const sandbox = await Deno.makeTempDir();
+  try {
+    const store = new WorkspaceSettingsStore(`${sandbox}/workspaces.json`);
+    await store.remember("/workspace/one");
+    await store.remember("/workspace/two");
+
+    await Promise.all([
+      store.rememberActiveFile("/workspace/one", "one.md"),
+      store.rememberActiveFile("/workspace/two", "two.md"),
+      store.remember("/workspace/three"),
+    ]);
+
+    const settings = await new WorkspaceSettingsStore(store.path).load();
+    assertEquals(settings.activeFiles, {
+      "/workspace/one": "one.md",
+      "/workspace/two": "two.md",
+    });
+    assertEquals(settings.recentWorkspaces.includes("/workspace/three"), true);
+  } finally {
+    await Deno.remove(sandbox, { recursive: true });
+  }
+});
+
 function assertEquals(actual: unknown, expected: unknown): void {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new Error(

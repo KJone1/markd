@@ -15,6 +15,8 @@ const EMPTY_SETTINGS: WorkspaceSettings = {
 };
 
 export class WorkspaceSettingsStore {
+  private pending: Promise<unknown> = Promise.resolve();
+
   constructor(readonly path: string) {}
 
   async load(): Promise<WorkspaceSettings> {
@@ -43,39 +45,32 @@ export class WorkspaceSettingsStore {
     }
   }
 
-  async remember(resolvedPath: string): Promise<WorkspaceSettings> {
-    const current = await this.load();
-    const next = {
+  remember(resolvedPath: string): Promise<WorkspaceSettings> {
+    return this.transact((current) => ({
       lastWorkspace: resolvedPath,
       recentWorkspaces: [
         resolvedPath,
         ...current.recentWorkspaces.filter((path) => path !== resolvedPath),
       ].slice(0, MAX_RECENT_WORKSPACES),
       activeFiles: current.activeFiles,
-    };
-    await this.save(next);
-    return next;
+    }));
   }
 
-  async rememberActiveFile(
+  rememberActiveFile(
     workspacePath: string,
     relativePath: string,
   ): Promise<WorkspaceSettings> {
-    const current = await this.load();
-    const next = {
+    return this.transact((current) => ({
       ...current,
       activeFiles: {
         ...current.activeFiles,
         [workspacePath]: relativePath,
       },
-    };
-    await this.save(next);
-    return next;
+    }));
   }
 
-  async remove(resolvedPath: string): Promise<WorkspaceSettings> {
-    const current = await this.load();
-    const next = {
+  remove(resolvedPath: string): Promise<WorkspaceSettings> {
+    return this.transact((current) => ({
       lastWorkspace: current.lastWorkspace === resolvedPath
         ? null
         : current.lastWorkspace,
@@ -87,38 +82,49 @@ export class WorkspaceSettingsStore {
           path !== resolvedPath
         ),
       ),
-    };
-    await this.save(next);
-    return next;
+    }));
   }
 
-  async prune(
+  prune(
     isAvailable: (path: string) => Promise<boolean>,
   ): Promise<WorkspaceSettings> {
-    const current = await this.load();
-    const recentWorkspaces: string[] = [];
-    for (const path of current.recentWorkspaces) {
-      try {
-        if (await isAvailable(path)) recentWorkspaces.push(path);
-      } catch {
-        // Unavailable entries are intentionally omitted.
+    return this.transact(async (current) => {
+      const recentWorkspaces: string[] = [];
+      for (const path of current.recentWorkspaces) {
+        try {
+          if (await isAvailable(path)) recentWorkspaces.push(path);
+        } catch {
+          // Unavailable entries are intentionally omitted.
+        }
       }
-    }
 
-    const next = {
-      lastWorkspace: current.lastWorkspace !== null &&
-          recentWorkspaces.includes(current.lastWorkspace)
-        ? current.lastWorkspace
-        : null,
-      recentWorkspaces,
-      activeFiles: Object.fromEntries(
-        Object.entries(current.activeFiles).filter(([path]) =>
-          recentWorkspaces.includes(path)
+      return {
+        lastWorkspace: current.lastWorkspace !== null &&
+            recentWorkspaces.includes(current.lastWorkspace)
+          ? current.lastWorkspace
+          : null,
+        recentWorkspaces,
+        activeFiles: Object.fromEntries(
+          Object.entries(current.activeFiles).filter(([path]) =>
+            recentWorkspaces.includes(path)
+          ),
         ),
-      ),
-    };
-    await this.save(next);
-    return next;
+      };
+    });
+  }
+
+  private transact(
+    update: (
+      current: WorkspaceSettings,
+    ) => WorkspaceSettings | Promise<WorkspaceSettings>,
+  ): Promise<WorkspaceSettings> {
+    const settled = this.pending.then(async () => {
+      const next = await update(await this.load());
+      await this.save(next);
+      return next;
+    });
+    this.pending = settled.catch(() => undefined);
+    return settled;
   }
 
   private async save(settings: WorkspaceSettings): Promise<void> {
