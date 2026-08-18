@@ -1,6 +1,7 @@
 import { registerDesktopBindings } from "./bindings.ts";
 import type { BindingRegistrar } from "./bindings.ts";
 import { pickNativeFolder } from "./folder_picker.ts";
+import { consumeOpenRequest, watchOpenRequests } from "./open_requests.ts";
 import { createStaticHandler } from "./server.ts";
 import { WorkspaceSettingsStore } from "./settings.ts";
 import {
@@ -8,7 +9,10 @@ import {
   type WorkspaceWindow,
 } from "./workspace_application.ts";
 
-interface DesktopBrowserWindow extends BindingRegistrar, WorkspaceWindow {}
+interface DesktopBrowserWindow extends BindingRegistrar, WorkspaceWindow {
+  navigate(url: string): void;
+  hide(): void;
+}
 
 const desktopRuntime = Deno as typeof Deno & {
   BrowserWindow?: new (options: {
@@ -18,41 +22,79 @@ const desktopRuntime = Deno as typeof Deno & {
   }) => DesktopBrowserWindow;
 };
 
-if (desktopRuntime.BrowserWindow) {
-  const window = new desktopRuntime.BrowserWindow({
-    title: "Markd",
-    width: 1120,
-    height: 760,
-  }) as unknown as DesktopBrowserWindow;
+const webRoot = new URL("../dist/web/", import.meta.url);
+const server = Deno.serve(
+  createStaticHandler((path) => Deno.readFile(new URL(path, webRoot))),
+);
+const appOrigin = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}/`;
 
-  window.addEventListener("close", () => Deno.exit(0));
+if (desktopRuntime.BrowserWindow) {
+  const BrowserWindow = desktopRuntime.BrowserWindow;
 
   const home = Deno.env.get("HOME");
   if (home === undefined) throw new Error("HOME is unavailable");
-  const workspace = new WorkspaceApplication(
-    new WorkspaceSettingsStore(
-      `${home}/Library/Application Support/Markd/workspaces.json`,
-    ),
-    window,
-    pickNativeFolder,
-    (message) => alert(message),
-    openExternalUrl,
+  const supportDirectory = `${home}/Library/Application Support/Markd`;
+  const openRequestPath = `${supportDirectory}/open-request`;
+  await Deno.mkdir(supportDirectory, { recursive: true });
+
+  const settings = new WorkspaceSettingsStore(
+    `${supportDirectory}/workspaces.json`,
+  );
+  const sessions = new Set<WorkspaceApplication>();
+  let menuOwner: WorkspaceApplication | null = null;
+
+  const openSession = async (
+    requestedPath: string | null,
+    restoreLastWorkspace: boolean,
+  ): Promise<void> => {
+    const window = new BrowserWindow({
+      title: "Markd",
+      width: 1120,
+      height: 760,
+    }) as unknown as DesktopBrowserWindow;
+
+    const workspace: WorkspaceApplication = new WorkspaceApplication(
+      settings,
+      window,
+      pickNativeFolder,
+      (message) => alert(message),
+      openExternalUrl,
+      () => menuOwner === workspace,
+    );
+    sessions.add(workspace);
+    menuOwner = workspace;
+
+    window.addEventListener("focus", () => {
+      menuOwner = workspace;
+      workspace.claimApplicationMenu();
+    });
+    // The webview backend marks the window closed without destroying it.
+    window.addEventListener("close", () => {
+      window.hide();
+      sessions.delete(workspace);
+      if (menuOwner === workspace) menuOwner = null;
+      workspace.dispose().catch(() => undefined);
+      if (sessions.size > 0) return;
+      stopWatchingRequests();
+      Deno.exit(0);
+    });
+
+    registerDesktopBindings(window, {
+      platform: Deno.build.os,
+      arch: Deno.build.arch,
+      version: Deno.version.deno,
+    }, workspace);
+    window.navigate(appOrigin);
+    await workspace.initialize(requestedPath, { restoreLastWorkspace });
+  };
+
+  const stopWatchingRequests = watchOpenRequests(
+    openRequestPath,
+    (requestedPath) => void openSession(requestedPath, false),
   );
 
-  registerDesktopBindings(window, {
-    platform: Deno.build.os,
-    arch: Deno.build.arch,
-    version: Deno.version.deno,
-  }, workspace);
-  await workspace.initialize();
+  await openSession(await consumeOpenRequest(openRequestPath), true);
 }
-
-const webRoot = new URL("../dist/web/", import.meta.url);
-const handler = createStaticHandler((path) =>
-  Deno.readFile(new URL(path, webRoot))
-);
-
-Deno.serve(handler);
 
 async function openExternalUrl(url: string): Promise<void> {
   const command = new Deno.Command("/usr/bin/open", {

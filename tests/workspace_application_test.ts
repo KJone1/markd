@@ -288,6 +288,154 @@ Deno.test("active Markdown enables native Save and dispatches the save bridge", 
   }
 });
 
+Deno.test("a requested file opens its folder as the workspace", async () => {
+  const sandbox = await Deno.makeTempDir();
+  try {
+    const rootPath = `${sandbox}/workspace`;
+    await Deno.mkdir(rootPath);
+    await Deno.writeTextFile(`${rootPath}/note.md`, "# Requested");
+    const window = new FakeWindow();
+    const app = new WorkspaceApplication(
+      new WorkspaceSettingsStore(`${sandbox}/settings.json`),
+      window,
+      () => Promise.reject(new Error("The picker must stay closed")),
+      () => undefined,
+    );
+
+    await app.initialize(`${rootPath}/note.md`);
+
+    const navigation = await app.getNavigation();
+    assertEquals(navigation.rootPath, await Deno.realPath(rootPath));
+    assertEquals(navigation.activeFile?.path, "note.md");
+    assertEquals(
+      (await app.getState()).activePath,
+      await Deno.realPath(rootPath),
+    );
+    await app.dispose();
+  } finally {
+    await Deno.remove(sandbox, { recursive: true });
+  }
+});
+
+Deno.test("a requested file inside the workspace keeps the current root", async () => {
+  const sandbox = await Deno.makeTempDir();
+  try {
+    const rootPath = `${sandbox}/workspace`;
+    await Deno.mkdir(`${rootPath}/notes`, { recursive: true });
+    await Deno.writeTextFile(`${rootPath}/notes/nested.md`, "# Nested");
+    const window = new FakeWindow();
+    const app = new WorkspaceApplication(
+      new WorkspaceSettingsStore(`${sandbox}/settings.json`),
+      window,
+      () => Promise.resolve(rootPath),
+      () => undefined,
+    );
+
+    await app.initialize();
+    await app.openFolder();
+    assertEquals(await app.openPath(`${rootPath}/notes/nested.md`), true);
+
+    const navigation = await app.getNavigation();
+    assertEquals(navigation.rootPath, await Deno.realPath(rootPath));
+    assertEquals(navigation.activeFile?.path, "notes/nested.md");
+    assertEquals(
+      window.executedSources.some((source) =>
+        source.includes("markd-files-change")
+      ),
+      true,
+    );
+    await app.dispose();
+  } finally {
+    await Deno.remove(sandbox, { recursive: true });
+  }
+});
+
+Deno.test("a missing requested path falls back to the last workspace", async () => {
+  const sandbox = await Deno.makeTempDir();
+  try {
+    const rootPath = `${sandbox}/workspace`;
+    await Deno.mkdir(rootPath);
+    const store = new WorkspaceSettingsStore(`${sandbox}/settings.json`);
+    await store.remember(await Deno.realPath(rootPath));
+    const errors: string[] = [];
+    const app = new WorkspaceApplication(
+      store,
+      new FakeWindow(),
+      () => Promise.reject(new Error("The picker must stay closed")),
+      (message) => errors.push(message),
+    );
+
+    await app.initialize(`${sandbox}/missing/note.md`);
+
+    assertEquals(errors, ["Markd could not open that path."]);
+    assertEquals(
+      (await app.getState()).activePath,
+      await Deno.realPath(rootPath),
+    );
+    await app.dispose();
+  } finally {
+    await Deno.remove(sandbox, { recursive: true });
+  }
+});
+
+Deno.test("a new window opens empty instead of restoring the last workspace", async () => {
+  const sandbox = await Deno.makeTempDir();
+  try {
+    const rootPath = `${sandbox}/workspace`;
+    await Deno.mkdir(rootPath);
+    const store = new WorkspaceSettingsStore(`${sandbox}/settings.json`);
+    await store.remember(await Deno.realPath(rootPath));
+    const app = new WorkspaceApplication(
+      store,
+      new FakeWindow(),
+      () => Promise.reject(new Error("The picker must stay closed")),
+      () => undefined,
+    );
+
+    await app.initialize(null, { restoreLastWorkspace: false });
+
+    assertEquals((await app.getState()).activePath, null);
+    assertEquals(
+      (await store.load()).lastWorkspace,
+      await Deno.realPath(rootPath),
+    );
+    await app.dispose();
+  } finally {
+    await Deno.remove(sandbox, { recursive: true });
+  }
+});
+
+Deno.test("only the focused window writes the shared application menu", async () => {
+  const sandbox = await Deno.makeTempDir();
+  try {
+    const rootPath = `${sandbox}/workspace`;
+    await Deno.mkdir(rootPath);
+    await Deno.writeTextFile(`${rootPath}/note.md`, "# note\n");
+    const window = new FakeWindow();
+    let focused = false;
+    const app = new WorkspaceApplication(
+      new WorkspaceSettingsStore(`${sandbox}/settings.json`),
+      window,
+      () => Promise.resolve(rootPath),
+      () => undefined,
+      undefined,
+      () => focused,
+    );
+
+    await app.initialize(null, { restoreLastWorkspace: false });
+    await app.openFolder();
+    await app.openFile("note.md");
+    assertEquals(window.menu, []);
+
+    focused = true;
+    app.claimApplicationMenu();
+    assertEquals(nativeSaveEnabled(window.menu), true);
+    await app.dispose();
+  } finally {
+    await Deno.remove(sandbox, { recursive: true });
+  }
+});
+
 class FakeWindow {
   menu: ApplicationMenuItem[] = [];
   executedSources: string[] = [];

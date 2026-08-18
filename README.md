@@ -24,3 +24,9 @@ A minimalist local editor built because existing markdown tools fail to cleanly 
 ```bash
 just run
 ```
+
+Install the app and the `markd` command into `~/.local/bin`:
+
+```bash
+just install
+```

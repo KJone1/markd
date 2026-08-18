@@ -6,7 +6,14 @@ import type {
   WorkspaceNavigation,
   WorkspaceState,
 } from "../src/shared/desktop.ts";
-import { dirname, extname, posix } from "node:path";
+import {
+  basename,
+  dirname,
+  extname,
+  isAbsolute,
+  posix,
+  relative,
+} from "node:path";
 import { WorkspaceFiles } from "./files.ts";
 import { WorkspaceDocuments } from "./documents.ts";
 import {
@@ -24,7 +31,7 @@ import {
 export interface WorkspaceWindow {
   setApplicationMenu(menu: ApplicationMenuItem[]): void;
   addEventListener(
-    type: "menuclick" | "close",
+    type: "menuclick" | "close" | "focus",
     listener: (event: Event & { detail?: { id?: string } }) => void,
   ): void;
   executeJs(source: string): Promise<unknown>;
@@ -33,6 +40,7 @@ export interface WorkspaceWindow {
 export type FolderPicker = () => Promise<string | null>;
 export type ErrorPresenter = (message: string) => void;
 export type ExternalUrlOpener = (url: string) => Promise<void>;
+export type MenuOwnershipCheck = () => boolean;
 
 export class WorkspaceApplication {
   private readonly controller: WorkspaceController;
@@ -50,6 +58,7 @@ export class WorkspaceApplication {
     private readonly showError: ErrorPresenter,
     private readonly openExternal: ExternalUrlOpener = () =>
       Promise.reject(new Error("External URLs are unavailable.")),
+    private readonly ownsMenu: MenuOwnershipCheck = () => true,
   ) {
     this.controller = new WorkspaceController(settings, async () => {
       const accepted = await this.window.executeJs(
@@ -63,11 +72,16 @@ export class WorkspaceApplication {
     });
   }
 
-  async initialize(): Promise<void> {
+  async initialize(
+    requestedPath: string | null = null,
+    options: { restoreLastWorkspace?: boolean } = {},
+  ): Promise<void> {
     const persisted = await this.settings.load();
     const available = await this.settings.prune(isAvailableWorkspace);
     await this.refreshMenu(available.recentWorkspaces);
 
+    if (requestedPath !== null && await this.openPath(requestedPath)) return;
+    if (options.restoreLastWorkspace === false) return;
     if (persisted.lastWorkspace === null) return;
     if (available.lastWorkspace === persisted.lastWorkspace) {
       await this.controller.open(persisted.lastWorkspace, {
@@ -110,6 +124,50 @@ export class WorkspaceApplication {
     await this.settings.rememberActiveFile(this.files.root.path, path);
     await this.refreshMenu(this.recentWorkspaces);
     return this.activeFile;
+  }
+
+  async openPath(requestedPath: string): Promise<boolean> {
+    let resolvedPath: string;
+    let isDirectory: boolean;
+    try {
+      resolvedPath = await Deno.realPath(requestedPath);
+      isDirectory = (await Deno.stat(resolvedPath)).isDirectory;
+    } catch {
+      this.showError("Markd could not open that path.");
+      return false;
+    }
+
+    const activeRoot = this.controller.active?.path ?? null;
+    if (
+      !isDirectory && activeRoot !== null && this.files !== null &&
+      isInsideWorkspace(activeRoot, resolvedPath)
+    ) {
+      const opened = await this.openActiveFile(
+        relative(activeRoot, resolvedPath),
+      );
+      await this.notifyNavigation({
+        rootPath: activeRoot,
+        entries: await this.files.index(),
+        activeFile: this.activeFile,
+      });
+      return opened;
+    }
+
+    try {
+      const result = await this.controller.open(
+        isDirectory ? resolvedPath : dirname(resolvedPath),
+      );
+      if (!result.opened) return false;
+    } catch {
+      this.showError("Markd could not open that folder.");
+      return false;
+    }
+
+    await this.activateWorkspace();
+    if (!isDirectory) await this.openActiveFile(basename(resolvedPath));
+    await this.refreshMenu();
+    await this.notifyRenderer();
+    return true;
   }
 
   async saveDocument(
@@ -231,6 +289,16 @@ export class WorkspaceApplication {
     }
   }
 
+  private async openActiveFile(relativePath: string): Promise<boolean> {
+    try {
+      await this.openFile(relativePath);
+      return true;
+    } catch {
+      this.showError("Markd could not open that file.");
+      return false;
+    }
+  }
+
   private async handleMenuClick(id: string | undefined): Promise<void> {
     if (id === "open-folder") {
       await this.openFolder();
@@ -246,9 +314,17 @@ export class WorkspaceApplication {
     }
   }
 
+  claimApplicationMenu(): void {
+    this.applyMenu();
+  }
+
   private async refreshMenu(recentWorkspaces?: string[]): Promise<void> {
     this.recentWorkspaces = recentWorkspaces ??
       (await this.settings.prune(isAvailableWorkspace)).recentWorkspaces;
+    if (this.ownsMenu()) this.applyMenu();
+  }
+
+  private applyMenu(): void {
     this.window.setApplicationMenu(
       buildApplicationMenu(
         this.recentWorkspaces,
@@ -346,6 +422,12 @@ const MARKDOWN_IMAGE_EXTENSIONS = new Set([
   ".svg",
   ".webp",
 ]);
+
+function isInsideWorkspace(rootPath: string, path: string): boolean {
+  const relativePath = relative(rootPath, path);
+  return relativePath !== "" && !relativePath.startsWith("..") &&
+    !isAbsolute(relativePath);
+}
 
 async function isAvailableWorkspace(path: string): Promise<boolean> {
   try {

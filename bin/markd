@@ -1,0 +1,41 @@
+#!/bin/sh
+set -eu
+
+app="${MARKD_APP:-/Applications/Markd.app}"
+support="$HOME/Library/Application Support/Markd"
+
+if [ "$#" -gt 1 ]; then
+  echo "usage: markd [path]" >&2
+  exit 64
+fi
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  echo "usage: markd [path]"
+  echo "       markd            open Markd"
+  echo "       markd <file>     open the file, using its folder as the workspace"
+  echo "       markd <folder>   open the folder as the workspace"
+  exit 0
+fi
+
+if [ ! -d "$app" ]; then
+  echo "markd: $app is not installed (run: just install)" >&2
+  exit 69
+fi
+
+if [ "$#" -eq 1 ]; then
+  case "$1" in
+  /*) target="$1" ;;
+  *) target="$(pwd -P)/$1" ;;
+  esac
+
+  if [ ! -e "$target" ]; then
+    echo "markd: $1: no such file or directory" >&2
+    exit 66
+  fi
+
+  mkdir -p "$support"
+  printf '%s\n' "$target" >"$support/open-request.tmp"
+  mv "$support/open-request.tmp" "$support/open-request"
+fi
+
+exec open -a "$app"
