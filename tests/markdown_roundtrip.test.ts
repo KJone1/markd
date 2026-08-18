@@ -169,6 +169,44 @@ describe("Markdown round trips", () => {
     });
   });
 
+  it("joins an inline code span that wraps across source lines", async () => {
+    const view = render(MarkdownEditor, {
+      props: {
+        path: "notes/wrapped-code.md",
+        content: [
+          "Cruft is a fixed list: `Add action items to close",
+          "the loop on open questions or concerns.`, and a trailing note.",
+          "",
+        ].join("\n"),
+      },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing notes/wrapped-code.md",
+    });
+    const span = await waitFor(() => {
+      const found = [...editor.querySelectorAll("code")].find((item) =>
+        item.textContent?.startsWith("Add action items")
+      );
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    expect(span.textContent).toBe(
+      "Add action items to close the loop on open questions or concerns.",
+    );
+    expect(editor.querySelectorAll("code")).toHaveLength(1);
+    expect(span.closest("p")?.querySelector("br")).toBeNull();
+
+    const paragraph = span.closest("p")!;
+    paragraph.append(" edited");
+    await fireEvent.input(editor);
+    await waitFor(() => {
+      const markdown = view.emitted<string[]>("change").at(-1)![0]!;
+      expect(markdown).toContain(
+        "`Add action items to close the loop on open questions or concerns.`",
+      );
+    });
+  });
+
   it("serializes visual document, link, and image edits through Crepe", async () => {
     const resolveImage = vi.fn((path: string) =>
       Promise.resolve(`http://127.0.0.1:49152/workspace/${path}`)
@@ -282,13 +320,14 @@ describe("Top bar", () => {
         "Code block",
         "Quote",
         "Divider",
+        "Copy file path",
       ]
     ) {
       expect(await screen.findByRole("button", { name })).toBeTruthy();
     }
     expect(
       view.container.querySelectorAll(".milkdown-top-bar .top-bar-item"),
-    ).toHaveLength(13);
+    ).toHaveLength(14);
 
     const paragraph = view.container.querySelector(".ProseMirror p")!;
     await fireEvent.mouseOver(paragraph);

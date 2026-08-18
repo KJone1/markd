@@ -15,6 +15,9 @@ import {
   restoreMarkerSources,
 } from "../editor/prompt-sections.ts";
 import { createHtmlFeature } from "../editor/html.ts";
+import { inlineCodeFeature } from "../editor/inline-code.ts";
+import { footnotesFeature } from "../editor/footnotes.ts";
+import { copyPathIcon } from "../editor/icons.ts";
 
 function prepareMarkdown(markdown: string): string {
   return preparePromptSectionMarkdown(prepareFrontmatterMarkdown(markdown));
@@ -32,6 +35,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   change: [content: string];
+  copyPath: [];
 }>();
 
 const host = ref<HTMLElement>();
@@ -182,6 +186,7 @@ function labelEditorControls(): void {
     [".milkdown-top-bar .top-bar-item:nth-of-type(11)", "Code block", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(12)", "Quote", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(13)", "Divider", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(14)", "Copy file path", "pointerdown"],
   ] as const;
   for (const [selector, label, activationEvent] of controlLabels) {
     host.value?.querySelectorAll<HTMLElement>(selector).forEach((control) => {
@@ -269,12 +274,19 @@ onMounted(async () => {
           block.group.items = block.group.items.filter(
             (item) => item.key !== "math",
           );
+          builder.addGroup("document", "Document").addItem("copy-path", {
+            icon: copyPathIcon,
+            active: () => false,
+            onRun: () => emit("copyPath"),
+          });
         },
       },
     },
   });
   instance.addFeature(frontmatterFeature);
   instance.addFeature(promptSectionsFeature);
+  instance.addFeature(inlineCodeFeature);
+  instance.addFeature(footnotesFeature);
   instance.addFeature(createHtmlFeature({
     resolveImage: (path) => props.resolveImage?.(path),
   }));

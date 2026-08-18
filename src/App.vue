@@ -47,6 +47,13 @@ const workspaceName = computed(() => {
   return path?.split("/").filter(Boolean).at(-1) ?? null;
 });
 
+function copyActivePath(): void {
+  const path = navigation.value.activeFile?.path;
+  if (path === undefined) return;
+  const root = navigation.value.rootPath;
+  void navigator.clipboard.writeText(root === null ? path : `${root}/${path}`);
+}
+
 type EditableActiveFile = Extract<ActiveFile, { content: string }> & {
   kind: "code" | "markdown";
 };
@@ -316,6 +323,7 @@ onBeforeUnmount(() => {
         :content="editorContent"
         :resolve-image="resolveMarkdownImage"
         @change="editDocument"
+        @copy-path="copyActivePath"
       />
       <section
         v-if="navigation.activeFile.kind !== 'code' && navigation.activeFile.kind !== 'markdown'"

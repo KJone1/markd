@@ -148,15 +148,20 @@ describe("MarkdownEditor", () => {
     expect(view.emitted("change")).toEqual([[serialized]]);
   });
 
-  it("configures the top bar to drop only the math item via buildTopBar", async () => {
-    render(MarkdownEditor, {
+  it("configures the top bar to drop the math item and add copy path via buildTopBar", async () => {
+    const view = render(MarkdownEditor, {
       props: { path: "notes/topbar.md", content: "# Heading" },
     });
     await waitFor(() => expect(crepeState.instances).toHaveLength(1));
     const instance = crepeState.instances[0]!;
+    type ItemGroup = { group: { items: { key: string }[] } };
+    type Item = { icon: string; active: () => boolean; onRun: () => void };
     const buildTopBar = instance.config.featureConfigs?.["top-bar"]
       ?.buildTopBar as (builder: {
-        getGroup: (key: string) => { group: { items: { key: string }[] } };
+        getGroup: (key: string) => ItemGroup;
+        addGroup: (key: string, label: string) => {
+          addItem: (key: string, item: Item) => void;
+        };
       }) => void;
     expect(buildTopBar).toBeInstanceOf(Function);
 
@@ -166,8 +171,14 @@ describe("MarkdownEditor", () => {
     const otherGroup = {
       group: { items: [{ key: "quote" }, { key: "hr" }] },
     };
+    const addedGroups: { key: string; label: string }[] = [];
+    const addedItems: { key: string; item: Item }[] = [];
     buildTopBar({
       getGroup: (key) => (key === "block" ? blockGroup : otherGroup),
+      addGroup: (key, label) => {
+        addedGroups.push({ key, label });
+        return { addItem: (key, item) => addedItems.push({ key, item }) };
+      },
     });
 
     expect(blockGroup.group.items.map((item) => item.key)).toEqual([
@@ -177,6 +188,14 @@ describe("MarkdownEditor", () => {
       "quote",
       "hr",
     ]);
+    expect(addedGroups).toEqual([{ key: "document", label: "Document" }]);
+    expect(addedItems).toHaveLength(1);
+    const [copyPath] = addedItems;
+    expect(copyPath!.key).toBe("copy-path");
+    expect(copyPath!.item.icon).toContain("<svg");
+    expect(copyPath!.item.active()).toBe(false);
+    copyPath!.item.onRun();
+    expect(view.emitted("copyPath")).toEqual([[]]);
   });
 
   it("replaces external content without emitting an edit and destroys each instance once", async () => {

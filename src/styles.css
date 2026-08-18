@@ -590,6 +590,49 @@ button {
   color: var(--color-muted);
 }
 
+.markdown-editor .footnote-reference,
+.markdown-editor .footnote-definition {
+  transition: background 300ms ease, box-shadow 300ms ease;
+}
+
+.markdown-editor .footnote-definition {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0 var(--space-xs);
+  margin: var(--space-xs) 0;
+  font-size: 14px;
+}
+
+.markdown-editor .footnote-definition > dt {
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown-editor .footnote-definition > dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.markdown-editor .footnote-jump {
+  padding: 0;
+  color: var(--color-primary-active);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.markdown-editor .footnote-jump:hover {
+  color: var(--color-primary-pressed);
+}
+
+.markdown-editor [data-footnote-flash="true"] {
+  border-radius: var(--radius-md);
+  background: rgb(59 130 246 / 14%);
+  box-shadow: 0 0 0 4px rgb(59 130 246 / 14%);
+}
+
 .conflict-dialog {
   position: fixed;
   z-index: 40;
