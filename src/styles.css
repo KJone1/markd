@@ -113,6 +113,7 @@ button {
   min-height: 100vh;
   display: grid;
   grid-template-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .html-preview-view,
@@ -315,9 +316,10 @@ button {
 .markdown-editor {
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow: hidden auto;
   color: var(--color-body);
   background: var(--color-canvas);
+  scroll-behavior: smooth;
 }
 
 .markdown-editor .milkdown {
@@ -363,6 +365,12 @@ button {
   padding: var(--space-xxl);
   color: var(--color-body);
   caret-color: var(--color-primary-active);
+  overflow-wrap: anywhere;
+}
+
+.markdown-editor .milkdown .ProseMirror > * {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .markdown-editor .milkdown .ProseMirror:focus-visible {
@@ -434,6 +442,37 @@ button {
 
 .markdown-editor .milkdown .milkdown-code-block .milkdown-code-block-placeholder {
   color: var(--crepe-color-on-surface-variant);
+}
+
+.markdown-editor .milkdown .milkdown-code-block .codemirror-host,
+.markdown-editor .milkdown .milkdown-code-block .cm-editor {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.markdown-editor .milkdown .milkdown-code-block .cm-scroller {
+  overflow-x: auto;
+}
+
+.markdown-editor .milkdown .milkdown-code-block .cm-scroller::-webkit-scrollbar {
+  height: 6px;
+}
+
+.markdown-editor .milkdown .milkdown-code-block .cm-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.markdown-editor .milkdown .milkdown-code-block .cm-scroller::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 20%);
+  border-radius: 9999px;
+}
+
+.markdown-editor .milkdown .milkdown-code-block .cm-scroller::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 35%);
+}
+
+.markdown-editor .milkdown .milkdown-code-block .cm-line {
+  white-space: pre;
 }
 
 .markdown-editor .milkdown button,
