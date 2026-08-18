@@ -10,6 +10,8 @@ Deno.test("workspace index is hierarchical and skips generated or unsafe paths",
     await Deno.mkdir(`${rootPath}/node_modules`);
     await Deno.mkdir(`${rootPath}/dist`);
     await Deno.mkdir(`${rootPath}/.vscode`);
+    await Deno.mkdir(`${rootPath}/.ruff_cache`);
+    await Deno.mkdir(`${rootPath}/.turbo-cache`);
     await Deno.mkdir(outsidePath);
     await Deno.writeTextFile(`${rootPath}/.env`, "visible");
     await Deno.writeTextFile(`${rootPath}/.gitignore`, "visible");
@@ -21,6 +23,8 @@ Deno.test("workspace index is hierarchical and skips generated or unsafe paths",
     await Deno.writeTextFile(`${rootPath}/notes/today.md`, "# Today");
     await Deno.writeTextFile(`${rootPath}/node_modules/package.js`, "hidden");
     await Deno.writeTextFile(`${rootPath}/dist/output.js`, "hidden");
+    await Deno.writeTextFile(`${rootPath}/.ruff_cache/CACHEDIR.TAG`, "hidden");
+    await Deno.writeTextFile(`${rootPath}/.turbo-cache/entry.json`, "hidden");
     await Deno.writeTextFile(`${outsidePath}/secret.md`, "outside");
     await Deno.symlink(outsidePath, `${rootPath}/external`);
     await Deno.symlink(`${rootPath}/missing`, `${rootPath}/broken`);

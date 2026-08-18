@@ -16,6 +16,8 @@ const EXCLUDED_DIRECTORIES = new Set([
   "build",
 ]);
 
+const EXCLUDED_DIRECTORY_PATTERN = /[-_]cache$/;
+
 const EXCLUDED_FILES = new Set([
   ".DS_Store",
   "Thumbs.db",
@@ -252,6 +254,7 @@ export class WorkspaceFiles {
       if (info.isDirectory) {
         if (
           EXCLUDED_DIRECTORIES.has(entry.name) ||
+          EXCLUDED_DIRECTORY_PATTERN.test(entry.name) ||
           visitedDirectories.has(resolvedPath)
         ) {
           continue;
