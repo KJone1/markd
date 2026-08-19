@@ -114,6 +114,7 @@ watch(
       selectCurrentOrRoot();
       await nextTick();
       tree.value?.focus();
+      void revealSelected();
       return;
     }
     if (wasOpen) {
@@ -127,14 +128,18 @@ watch(
 watch(
   () => props.currentPath,
   () => {
-    if (props.open) selectCurrentOrRoot();
+    if (!props.open) return;
+    selectCurrentOrRoot();
+    void revealSelected();
   },
 );
 
 watch(
   () => props.entries,
   () => {
-    if (props.open) selectCurrentOrRoot();
+    if (!props.open) return;
+    selectCurrentOrRoot();
+    void revealSelected();
   },
 );
 
@@ -164,6 +169,14 @@ function selectCurrentOrRoot(): void {
   }
 }
 
+async function revealSelected(): Promise<void> {
+  await nextTick();
+  if (selectedPath.value === null) return;
+  document.getElementById(itemId(selectedPath.value))?.scrollIntoView({
+    block: "nearest",
+  });
+}
+
 function handleKeydown(event: KeyboardEvent): void {
   const current = visibleEntries.value[selectedIndex.value];
   if (event.key === "Tab") {
@@ -186,6 +199,14 @@ function handleKeydown(event: KeyboardEvent): void {
       Math.max(0, selectedIndex.value + direction),
     );
     selectedPath.value = visibleEntries.value[nextIndex]?.entry.path ?? null;
+    void revealSelected();
+    return;
+  }
+  if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    const index = event.key === "Home" ? 0 : visibleEntries.value.length - 1;
+    selectedPath.value = visibleEntries.value[index]?.entry.path ?? null;
+    void revealSelected();
     return;
   }
   if (event.key === "ArrowRight") {
@@ -199,6 +220,7 @@ function handleKeydown(event: KeyboardEvent): void {
       expanded.value.delete(current.entry.path);
     } else if (current.parentPath !== null) {
       selectedPath.value = current.parentPath;
+      void revealSelected();
     }
     return;
   }
