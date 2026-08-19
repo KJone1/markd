@@ -64,7 +64,7 @@ async function openActiveFileInZed(): Promise<void> {
   }
 }
 
-type EditableActiveFile =Extract<ActiveFile, { content: string }> & {
+type EditableActiveFile = Extract<ActiveFile, { content: string }> & {
   kind: "code" | "markdown";
 };
 
