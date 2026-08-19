@@ -48,6 +48,10 @@ export interface BindingRegistrar {
     handler: (url: string) => Promise<void>,
   ): void;
   bind(
+    name: "openInZed",
+    handler: (path: string) => Promise<void>,
+  ): void;
+  bind(
     name: "openFolder",
     handler: () => Promise<WorkspaceState & { opened: boolean }>,
   ): void;
@@ -67,6 +71,7 @@ export interface WorkspaceBindings {
     imagePath: string,
   ): Promise<string>;
   openExternalUrl(url: string): Promise<void>;
+  openInZed(path: string): Promise<void>;
   openFolder(): Promise<WorkspaceState & { opened: boolean }>;
 }
 
@@ -99,5 +104,6 @@ export function registerDesktopBindings(
       workspace.getMarkdownImageUrl(documentPath, imagePath),
   );
   registrar.bind("openExternalUrl", (url) => workspace.openExternalUrl(url));
+  registrar.bind("openInZed", (path) => workspace.openInZed(path));
   registrar.bind("openFolder", () => workspace.openFolder());
 }

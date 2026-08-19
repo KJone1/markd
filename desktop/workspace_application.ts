@@ -40,6 +40,7 @@ export interface WorkspaceWindow {
 export type FolderPicker = () => Promise<string | null>;
 export type ErrorPresenter = (message: string) => void;
 export type ExternalUrlOpener = (url: string) => Promise<void>;
+export type EditorOpener = (path: string) => Promise<void>;
 export type MenuOwnershipCheck = () => boolean;
 
 export class WorkspaceApplication {
@@ -58,6 +59,8 @@ export class WorkspaceApplication {
     private readonly showError: ErrorPresenter,
     private readonly openExternal: ExternalUrlOpener = () =>
       Promise.reject(new Error("External URLs are unavailable.")),
+    private readonly openEditor: EditorOpener = () =>
+      Promise.reject(new Error("Zed is unavailable.")),
     private readonly ownsMenu: MenuOwnershipCheck = () => true,
   ) {
     this.controller = new WorkspaceController(settings, async () => {
@@ -245,6 +248,11 @@ export class WorkspaceApplication {
       throw new Error("Only web links can open outside the preview.");
     }
     await this.openExternal(target.href);
+  }
+
+  async openInZed(path: string): Promise<void> {
+    if (this.files === null) throw new Error("No workspace is open.");
+    await this.openEditor(await this.files.root.resolveExistingPath(path));
   }
 
   async dispose(): Promise<void> {

@@ -54,7 +54,17 @@ function copyActivePath(): void {
   void navigator.clipboard.writeText(root === null ? path : `${root}/${path}`);
 }
 
-type EditableActiveFile = Extract<ActiveFile, { content: string }> & {
+async function openActiveFileInZed(): Promise<void> {
+  const path = navigation.value.activeFile?.path;
+  if (path === undefined) return;
+  try {
+    await bindings.openInZed(path);
+  } catch {
+    saveError.value = "Markd could not open this file in Zed.";
+  }
+}
+
+type EditableActiveFile =Extract<ActiveFile, { content: string }> & {
   kind: "code" | "markdown";
 };
 
@@ -324,6 +334,7 @@ onBeforeUnmount(() => {
         :resolve-image="resolveMarkdownImage"
         @change="editDocument"
         @copy-path="copyActivePath"
+        @open-in-zed="openActiveFileInZed"
       />
       <section
         v-if="navigation.activeFile.kind !== 'code' && navigation.activeFile.kind !== 'markdown'"

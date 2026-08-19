@@ -17,7 +17,8 @@ import {
 import { createHtmlFeature } from "../editor/html.ts";
 import { inlineCodeFeature } from "../editor/inline-code.ts";
 import { footnotesFeature } from "../editor/footnotes.ts";
-import { copyPathIcon } from "../editor/icons.ts";
+import { copyPathIcon, zedIcon } from "../editor/icons.ts";
+import { createTooltipHost, type TooltipHost } from "../editor/tooltips.ts";
 
 function prepareMarkdown(markdown: string): string {
   return preparePromptSectionMarkdown(prepareFrontmatterMarkdown(markdown));
@@ -36,6 +37,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   change: [content: string];
   copyPath: [];
+  openInZed: [];
 }>();
 
 const host = ref<HTMLElement>();
@@ -45,6 +47,7 @@ let destroyRequested = false;
 let destroyed = false;
 let applyingExternalChange = false;
 let controlObserver: MutationObserver | null = null;
+let tooltips: TooltipHost | null = null;
 
 function isEphemeralImageUrl(url: string): boolean {
   return url.trim().toLowerCase().startsWith("blob:");
@@ -187,12 +190,18 @@ function labelEditorControls(): void {
     [".milkdown-top-bar .top-bar-item:nth-of-type(12)", "Quote", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(13)", "Divider", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(14)", "Copy file path", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(15)", "Open in Zed", "pointerdown"],
   ] as const;
   for (const [selector, label, activationEvent] of controlLabels) {
     host.value?.querySelectorAll<HTMLElement>(selector).forEach((control) => {
       enhanceKeyboardButton(control, label, activationEvent);
     });
   }
+  host.value?.querySelectorAll<HTMLElement>(
+    ".milkdown-top-bar .top-bar-item",
+  ).forEach((item) => {
+    if (item.hasAttribute("aria-label")) tooltips?.attach(item);
+  });
   host.value?.querySelectorAll<HTMLElement>(".image-resize-handle").forEach(
     enhanceImageResizeHandle,
   );
@@ -233,6 +242,8 @@ function destroyEditor(): void {
   destroyed = true;
   controlObserver?.disconnect();
   controlObserver = null;
+  tooltips?.destroy();
+  tooltips = null;
   host.value?.removeEventListener(
     "keydown",
     preventEphemeralImageConfirmation,
@@ -274,10 +285,16 @@ onMounted(async () => {
           block.group.items = block.group.items.filter(
             (item) => item.key !== "math",
           );
-          builder.addGroup("document", "Document").addItem("copy-path", {
+          const documentGroup = builder.addGroup("document", "Document");
+          documentGroup.addItem("copy-path", {
             icon: copyPathIcon,
             active: () => false,
             onRun: () => emit("copyPath"),
+          });
+          documentGroup.addItem("open-in-zed", {
+            icon: zedIcon,
+            active: () => false,
+            onRun: () => emit("openInZed"),
           });
         },
       },
@@ -308,6 +325,7 @@ onMounted(async () => {
     destroyEditor();
     return;
   }
+  tooltips = createTooltipHost();
   labelEditorControls();
   controlObserver = new MutationObserver(labelEditorControls);
   controlObserver.observe(host.value, { childList: true, subtree: true });

@@ -189,13 +189,18 @@ describe("MarkdownEditor", () => {
       "hr",
     ]);
     expect(addedGroups).toEqual([{ key: "document", label: "Document" }]);
-    expect(addedItems).toHaveLength(1);
-    const [copyPath] = addedItems;
+    expect(addedItems).toHaveLength(2);
+    const [copyPath, openInZed] = addedItems;
     expect(copyPath!.key).toBe("copy-path");
     expect(copyPath!.item.icon).toContain("<svg");
     expect(copyPath!.item.active()).toBe(false);
     copyPath!.item.onRun();
     expect(view.emitted("copyPath")).toEqual([[]]);
+    expect(openInZed!.key).toBe("open-in-zed");
+    expect(openInZed!.item.icon).toContain("<svg");
+    expect(openInZed!.item.active()).toBe(false);
+    openInZed!.item.onRun();
+    expect(view.emitted("openInZed")).toEqual([[]]);
   });
 
   it("replaces external content without emitting an edit and destroys each instance once", async () => {

@@ -46,6 +46,7 @@ Deno.test("registerDesktopBindings exposes only typed app and workspace calls", 
         `http://127.0.0.1:49152/${documentPath}/${imagePath}`,
       ),
     openExternalUrl: () => Promise.resolve(),
+    openInZed: () => Promise.resolve(),
   });
 
   const names = [...registered.keys()];
@@ -58,6 +59,7 @@ Deno.test("registerDesktopBindings exposes only typed app and workspace calls", 
     "getHtmlPreviewUrl",
     "getMarkdownImageUrl",
     "openExternalUrl",
+    "openInZed",
     "openFolder",
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
@@ -136,6 +138,11 @@ Deno.test("registerDesktopBindings exposes only typed app and workspace calls", 
     | ((url: string) => Promise<unknown>)
     | undefined;
   assertEquals(await openExternalUrl?.("https://example.com/"), undefined);
+
+  const openInZed = registered.get("openInZed") as
+    | ((path: string) => Promise<unknown>)
+    | undefined;
+  assertEquals(await openInZed?.("notes/readme.md"), undefined);
 });
 
 function assertEquals(actual: unknown, expected: unknown): void {

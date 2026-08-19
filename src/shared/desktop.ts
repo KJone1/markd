@@ -87,6 +87,7 @@ export interface DesktopBindings {
     imagePath: string,
   ): Promise<string>;
   openExternalUrl(url: string): Promise<void>;
+  openInZed(path: string): Promise<void>;
   openFolder(): Promise<WorkspaceState & { opened: boolean }>;
 }
 
