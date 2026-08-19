@@ -314,6 +314,8 @@ describe("Top bar", () => {
         "Bullet list",
         "Ordered list",
         "Task list",
+        "Indent list item",
+        "Outdent list item",
         "Insert link",
         "Insert image",
         "Insert table",
@@ -327,7 +329,7 @@ describe("Top bar", () => {
     }
     expect(
       view.container.querySelectorAll(".milkdown-top-bar .top-bar-item"),
-    ).toHaveLength(14);
+    ).toHaveLength(17);
 
     const paragraph = view.container.querySelector(".ProseMirror p")!;
     await fireEvent.mouseOver(paragraph);

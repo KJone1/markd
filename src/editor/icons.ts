@@ -15,6 +15,32 @@ export const zedIcon = `
   </svg>
 `;
 
+export const indentIcon = `
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+  >
+    <path
+      d="M3 3h18v2H3V3zm8 4h10v2H11V7zm0 4h10v2H11v-2zm0 4h10v2H11v-2zM3 19h18v2H3v-2zM3 8l4 4-4 4V8z"
+    />
+  </svg>
+`;
+
+export const outdentIcon = `
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+  >
+    <path
+      d="M3 3h18v2H3V3zm8 4h10v2H11V7zm0 4h10v2H11v-2zm0 4h10v2H11v-2zM3 19h18v2H3v-2zM7 8v8l-4-4 4-4z"
+    />
+  </svg>
+`;
+
 export const copyPathIcon = `
   <svg
     xmlns="http://www.w3.org/2000/svg"

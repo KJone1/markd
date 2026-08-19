@@ -2,6 +2,11 @@
 import { Crepe } from "@milkdown/crepe";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/frame.css";
+import { commandsCtx } from "@milkdown/kit/core";
+import {
+  liftListItemCommand,
+  sinkListItemCommand,
+} from "@milkdown/kit/preset/commonmark";
 import { replaceAll } from "@milkdown/kit/utils";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
@@ -17,7 +22,13 @@ import {
 import { createHtmlFeature } from "../editor/html.ts";
 import { inlineCodeFeature } from "../editor/inline-code.ts";
 import { footnotesFeature } from "../editor/footnotes.ts";
-import { copyPathIcon, zedIcon } from "../editor/icons.ts";
+import { listIndentFeature } from "../editor/list-indent.ts";
+import {
+  copyPathIcon,
+  indentIcon,
+  outdentIcon,
+  zedIcon,
+} from "../editor/icons.ts";
 import { createTooltipHost, type TooltipHost } from "../editor/tooltips.ts";
 
 function prepareMarkdown(markdown: string): string {
@@ -183,14 +194,16 @@ function labelEditorControls(): void {
     [".milkdown-top-bar .top-bar-item:nth-of-type(5)", "Bullet list", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(6)", "Ordered list", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(7)", "Task list", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(8)", "Insert link", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(9)", "Insert image", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(10)", "Insert table", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(11)", "Code block", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(12)", "Quote", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(13)", "Divider", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(14)", "Copy file path", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(15)", "Open in Zed", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(8)", "Indent list item", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(9)", "Outdent list item", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(10)", "Insert link", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(11)", "Insert image", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(12)", "Insert table", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(13)", "Code block", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(14)", "Quote", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(15)", "Divider", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(16)", "Copy file path", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(17)", "Open in Zed", "pointerdown"],
   ] as const;
   for (const [selector, label, activationEvent] of controlLabels) {
     host.value?.querySelectorAll<HTMLElement>(selector).forEach((control) => {
@@ -281,6 +294,17 @@ onMounted(async () => {
       },
       [Crepe.Feature.TopBar]: {
         buildTopBar: (builder) => {
+          const list = builder.getGroup("list");
+          list.addItem("indent", {
+            icon: indentIcon,
+            active: () => false,
+            onRun: (ctx) => ctx.get(commandsCtx).call(sinkListItemCommand.key),
+          });
+          list.addItem("outdent", {
+            icon: outdentIcon,
+            active: () => false,
+            onRun: (ctx) => ctx.get(commandsCtx).call(liftListItemCommand.key),
+          });
           const block = builder.getGroup("block");
           block.group.items = block.group.items.filter(
             (item) => item.key !== "math",
@@ -304,6 +328,7 @@ onMounted(async () => {
   instance.addFeature(promptSectionsFeature);
   instance.addFeature(inlineCodeFeature);
   instance.addFeature(footnotesFeature);
+  instance.addFeature(listIndentFeature);
   instance.addFeature(createHtmlFeature({
     resolveImage: (path) => props.resolveImage?.(path),
   }));
