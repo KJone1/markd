@@ -4,9 +4,10 @@
   "tasks": {
     "dev": "deno task build:web && deno desktop --hmr --allow-env=HOME --allow-net=127.0.0.1 --allow-read --allow-run=/usr/bin/osascript,/usr/bin/open --allow-write --backend webview --include dist/web --icon assets/icons/markd-icon.icns desktop/main.ts",
     "build:web": "vite build",
-    "build": "deno task build:web && deno desktop --allow-env=HOME --allow-net=127.0.0.1 --allow-read --allow-run=/usr/bin/osascript,/usr/bin/open --allow-write --backend webview --include dist/web --icon assets/icons/markd-icon.icns --target aarch64-apple-darwin --output dist/Markd.app desktop/main.ts && deno run --allow-run=codesign --allow-write=dist/Markd.app scripts/seal_macos_bundle.ts dist/Markd.app Markd.dylib",
-    "typecheck": "deno check desktop/main.ts tests/*.ts && vue-tsc --noEmit",
-    "lint": "deno lint desktop scripts src tests vite.config.ts",
+    "build:cli": "deno compile --allow-env=HOME,MARKD_APP --allow-read --allow-write --allow-run=/usr/bin/open --output dist/markd cli/markd.ts",
+    "build": "deno task build:cli && deno task build:web && deno desktop --allow-env=HOME --allow-net=127.0.0.1 --allow-read --allow-run=/usr/bin/osascript,/usr/bin/open --allow-write --backend webview --include dist/web --icon assets/icons/markd-icon.icns --target aarch64-apple-darwin --output dist/Markd.app desktop/main.ts && deno run --allow-run=codesign --allow-write=dist/Markd.app scripts/seal_macos_bundle.ts dist/Markd.app Markd.dylib",
+    "typecheck": "deno check cli/markd.ts desktop/main.ts tests/*.ts && vue-tsc --noEmit",
+    "lint": "deno lint cli desktop scripts src tests vite.config.ts",
     "test": "deno test --allow-read --allow-write --allow-net=127.0.0.1 tests/desktop_boundary_test.ts tests/design_contrast_test.ts tests/documents_test.ts tests/files_test.ts tests/folder_picker_test.ts tests/macos_bundle_test.ts tests/open_requests_test.ts tests/preview_test.ts tests/settings_test.ts tests/static_handler_test.ts tests/workspace_application_test.ts tests/workspace_controller_test.ts tests/workspace_menu_test.ts tests/workspace_test.ts && vitest run",
     "check": "deno task typecheck && deno task lint && deno task test"
   },

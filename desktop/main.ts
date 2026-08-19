@@ -1,7 +1,13 @@
 import { registerDesktopBindings } from "./bindings.ts";
 import type { BindingRegistrar } from "./bindings.ts";
 import { pickNativeFolder } from "./folder_picker.ts";
-import { consumeOpenRequest, watchOpenRequests } from "./open_requests.ts";
+import {
+  bundlePathFor,
+  consumeOpenRequest,
+  removeRunningApp,
+  watchOpenRequests,
+  writeRunningApp,
+} from "./open_requests.ts";
 import { createStaticHandler } from "./server.ts";
 import { WorkspaceSettingsStore } from "./settings.ts";
 import {
@@ -35,7 +41,9 @@ if (desktopRuntime.BrowserWindow) {
   if (home === undefined) throw new Error("HOME is unavailable");
   const supportDirectory = `${home}/Library/Application Support/Markd`;
   const openRequestPath = `${supportDirectory}/open-request`;
+  const runningAppPath = `${supportDirectory}/running-app`;
   await Deno.mkdir(supportDirectory, { recursive: true });
+  await writeRunningApp(runningAppPath, bundlePathFor(Deno.execPath()));
 
   const settings = new WorkspaceSettingsStore(
     `${supportDirectory}/workspaces.json`,
@@ -59,6 +67,7 @@ if (desktopRuntime.BrowserWindow) {
       pickNativeFolder,
       (message) => alert(message),
       openExternalUrl,
+      openInZed,
       () => menuOwner === workspace,
     );
     sessions.add(workspace);
@@ -76,7 +85,7 @@ if (desktopRuntime.BrowserWindow) {
       workspace.dispose().catch(() => undefined);
       if (sessions.size > 0) return;
       stopWatchingRequests();
-      Deno.exit(0);
+      void removeRunningApp(runningAppPath).finally(() => Deno.exit(0));
     });
 
     registerDesktopBindings(window, {
@@ -96,9 +105,17 @@ if (desktopRuntime.BrowserWindow) {
   await openSession(await consumeOpenRequest(openRequestPath), true);
 }
 
-async function openExternalUrl(url: string): Promise<void> {
+function openExternalUrl(url: string): Promise<void> {
+  return runOpen([url]);
+}
+
+function openInZed(path: string): Promise<void> {
+  return runOpen(["-a", "Zed", path]);
+}
+
+async function runOpen(args: string[]): Promise<void> {
   const command = new Deno.Command("/usr/bin/open", {
-    args: [url],
+    args,
     stdout: "null",
     stderr: "piped",
   });

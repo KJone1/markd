@@ -11,4 +11,4 @@ install: build
     rm -rf /Applications/Markd.app
     cp -R dist/Markd.app /Applications/
     mkdir -p ~/.local/bin
-    install -m 755 bin/markd ~/.local/bin/markd
+    install -m 755 dist/markd ~/.local/bin/markd
