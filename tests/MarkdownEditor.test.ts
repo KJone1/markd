@@ -1,5 +1,10 @@
 import { cleanup, render, waitFor } from "@testing-library/vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { commandsCtx } from "@milkdown/kit/core";
+import {
+  liftListItemCommand,
+  sinkListItemCommand,
+} from "@milkdown/kit/preset/commonmark";
 import MarkdownEditor from "../src/components/MarkdownEditor.vue";
 
 interface MockCrepeInstance {
@@ -154,52 +159,94 @@ describe("MarkdownEditor", () => {
     });
     await waitFor(() => expect(crepeState.instances).toHaveLength(1));
     const instance = crepeState.instances[0]!;
-    type ItemGroup = { group: { items: { key: string }[] } };
-    type Item = { icon: string; active: () => boolean; onRun: () => void };
+    type Item = {
+      icon: string;
+      active: () => boolean;
+      onRun: (ctx: unknown) => void;
+    };
+    type GroupInstance = {
+      group: { items: { key: string }[] };
+      addItem: (key: string, item: Item) => GroupInstance;
+    };
     const buildTopBar = instance.config.featureConfigs?.["top-bar"]
       ?.buildTopBar as (builder: {
-        getGroup: (key: string) => ItemGroup;
-        addGroup: (key: string, label: string) => {
-          addItem: (key: string, item: Item) => void;
-        };
+        getGroup: (key: string) => GroupInstance;
+        addGroup: (key: string, label: string) => GroupInstance;
       }) => void;
     expect(buildTopBar).toBeInstanceOf(Function);
 
-    const blockGroup = {
-      group: { items: [{ key: "code-block" }, { key: "math" }] },
-    };
-    const otherGroup = {
-      group: { items: [{ key: "quote" }, { key: "hr" }] },
-    };
     const addedGroups: { key: string; label: string }[] = [];
-    const addedItems: { key: string; item: Item }[] = [];
+    const added: Record<string, { key: string; item: Item }[]> = {};
+    const groupInstance = (
+      name: string,
+      items: { key: string }[],
+    ): GroupInstance => {
+      added[name] = [];
+      const group = { items };
+      const self: GroupInstance = {
+        group,
+        addItem: (key, item) => {
+          added[name]!.push({ key, item });
+          return self;
+        },
+      };
+      return self;
+    };
+    const blockGroup = groupInstance("block", [
+      { key: "code-block" },
+      { key: "math" },
+    ]);
+    const listGroup = groupInstance("list", [
+      { key: "bullet-list" },
+      { key: "ordered-list" },
+    ]);
     buildTopBar({
-      getGroup: (key) => (key === "block" ? blockGroup : otherGroup),
+      getGroup: (key) => (key === "block" ? blockGroup : listGroup),
       addGroup: (key, label) => {
         addedGroups.push({ key, label });
-        return { addItem: (key, item) => addedItems.push({ key, item }) };
+        return groupInstance(key, []);
       },
     });
 
     expect(blockGroup.group.items.map((item) => item.key)).toEqual([
       "code-block",
     ]);
-    expect(otherGroup.group.items.map((item) => item.key)).toEqual([
-      "quote",
-      "hr",
+    expect(listGroup.group.items.map((item) => item.key)).toEqual([
+      "bullet-list",
+      "ordered-list",
     ]);
+    expect(added["list"]!.map(({ key }) => key)).toEqual([
+      "indent",
+      "outdent",
+    ]);
+    const call = vi.fn();
+    const ctx = {
+      get: (key: unknown) => {
+        expect(key).toBe(commandsCtx);
+        return { call };
+      },
+    };
+    const [indent, outdent] = added["list"]!;
+    for (const { item } of [indent!, outdent!]) {
+      expect(item.icon).toContain("<svg");
+      expect(item.active()).toBe(false);
+    }
+    indent!.item.onRun(ctx);
+    expect(call).toHaveBeenLastCalledWith(sinkListItemCommand.key);
+    outdent!.item.onRun(ctx);
+    expect(call).toHaveBeenLastCalledWith(liftListItemCommand.key);
     expect(addedGroups).toEqual([{ key: "document", label: "Document" }]);
-    expect(addedItems).toHaveLength(2);
-    const [copyPath, openInZed] = addedItems;
+    expect(added["document"]).toHaveLength(2);
+    const [copyPath, openInZed] = added["document"]!;
     expect(copyPath!.key).toBe("copy-path");
     expect(copyPath!.item.icon).toContain("<svg");
     expect(copyPath!.item.active()).toBe(false);
-    copyPath!.item.onRun();
+    copyPath!.item.onRun(undefined);
     expect(view.emitted("copyPath")).toEqual([[]]);
     expect(openInZed!.key).toBe("open-in-zed");
     expect(openInZed!.item.icon).toContain("<svg");
     expect(openInZed!.item.active()).toBe(false);
-    openInZed!.item.onRun();
+    openInZed!.item.onRun(undefined);
     expect(view.emitted("openInZed")).toEqual([[]]);
   });
 
