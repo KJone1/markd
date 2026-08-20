@@ -419,6 +419,7 @@ Deno.test("only the focused window writes the shared application menu", async ()
       () => Promise.resolve(rootPath),
       () => undefined,
       undefined,
+      undefined,
       () => focused,
     );
 
