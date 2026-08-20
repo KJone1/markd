@@ -10,6 +10,7 @@
   "dependencies": {
     "@milkdown/crepe": "^7.22.1",
     "@milkdown/kit": "^7.22.1",
+    "fuzzysort": "^3.1.0",
     "monaco-editor": "^0.55.1",
     "vue": "3.5.41"
   },

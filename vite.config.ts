@@ -48,7 +48,7 @@ export default defineConfig({
           if (components) return `vendor-milkdown-components-${components[1]}`;
 
           const vendor = id.match(
-            /\/node_modules\/(katex|codemirror|prosemirror-[a-z-]+|@codemirror\/[a-z0-9-]+|@milkdown\/[a-z0-9-]+)\//,
+            /\/node_modules\/(fuzzysort|katex|codemirror|prosemirror-[a-z-]+|@codemirror\/[a-z0-9-]+|@milkdown\/[a-z0-9-]+)\//,
           );
           if (vendor) {
             return `vendor-${vendor[1].replace(/^@/, "").replace(/\//g, "-")}`;

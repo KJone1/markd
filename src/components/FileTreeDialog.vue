@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import fuzzysort from "fuzzysort";
 import type { WorkspaceEntry } from "../shared/desktop.ts";
 
 interface EntryIcon {
@@ -13,6 +14,19 @@ interface VisibleEntry {
   level: number;
   parentPath: string | null;
   icon: EntryIcon;
+}
+
+interface SearchSegment {
+  text: string;
+  hl: boolean;
+}
+
+interface SearchRow {
+  entry: WorkspaceEntry;
+  dirname: string;
+  icon: EntryIcon;
+  nameSegments: SearchSegment[];
+  dirSegments: SearchSegment[];
 }
 
 const FOLDER =
@@ -87,6 +101,10 @@ const emit = defineEmits<{
 const tree = ref<HTMLElement>();
 const expanded = ref(new Set<string>());
 const selectedPath = ref<string | null>(null);
+const searchMode = ref(false);
+const query = ref("");
+const searchSelected = ref(0);
+const searchInput = ref<HTMLInputElement>();
 let returnFocus: HTMLElement | null = null;
 
 const visibleEntries = computed(() => flatten(props.entries));
@@ -102,6 +120,23 @@ const selectedId = computed(() =>
     : itemId(selectedPath.value)
 );
 
+const allFiles = computed(() => collectFiles(props.entries));
+const searchRows = computed<SearchRow[]>(() => {
+  if (query.value === "") {
+    return allFiles.value.map((entry) => searchRowFor(entry, null));
+  }
+  return fuzzysort
+    .go(query.value, allFiles.value, { key: "path", limit: 200 })
+    .map((result) => searchRowFor(result.obj, new Set(result.indexes)));
+});
+const searchIndex = computed(() =>
+  Math.min(searchSelected.value, Math.max(0, searchRows.value.length - 1))
+);
+const searchActiveId = computed(() => {
+  const row = searchRows.value[searchIndex.value];
+  return row === undefined ? undefined : searchItemId(row.entry.path);
+});
+
 watch(
   () => props.open,
   async (open, wasOpen) => {
@@ -111,6 +146,8 @@ watch(
           ? document.activeElement
           : null;
       }
+      searchMode.value = false;
+      query.value = "";
       selectCurrentOrRoot();
       await nextTick();
       tree.value?.focus();
@@ -128,7 +165,7 @@ watch(
 watch(
   () => props.currentPath,
   () => {
-    if (!props.open) return;
+    if (!props.open || searchMode.value) return;
     selectCurrentOrRoot();
     void revealSelected();
   },
@@ -137,11 +174,15 @@ watch(
 watch(
   () => props.entries,
   () => {
-    if (!props.open) return;
+    if (!props.open || searchMode.value) return;
     selectCurrentOrRoot();
     void revealSelected();
   },
 );
+
+watch(query, () => {
+  searchSelected.value = 0;
+});
 
 function flatten(
   entries: WorkspaceEntry[],
@@ -177,6 +218,102 @@ async function revealSelected(): Promise<void> {
   });
 }
 
+function collectFiles(entries: WorkspaceEntry[]): WorkspaceEntry[] {
+  return entries.flatMap((entry) =>
+    entry.kind === "directory" ? collectFiles(entry.children) : [entry]
+  );
+}
+
+function searchRowFor(
+  entry: WorkspaceEntry,
+  indexes: Set<number> | null,
+): SearchRow {
+  const slash = entry.path.lastIndexOf("/");
+  const dirname = slash === -1 ? "" : entry.path.slice(0, slash);
+  return {
+    entry,
+    dirname,
+    icon: iconFor(entry, false),
+    nameSegments: toSegments(entry.name, slash + 1, indexes),
+    dirSegments: toSegments(dirname, 0, indexes),
+  };
+}
+
+function toSegments(
+  text: string,
+  start: number,
+  indexes: Set<number> | null,
+): SearchSegment[] {
+  if (indexes === null) return text === "" ? [] : [{ text, hl: false }];
+  const segments: SearchSegment[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const hl = indexes.has(start + i);
+    const last = segments[segments.length - 1];
+    if (last !== undefined && last.hl === hl) last.text += text[i];
+    else segments.push({ text: text[i], hl });
+  }
+  return segments;
+}
+
+async function enterSearch(): Promise<void> {
+  searchMode.value = true;
+  query.value = "";
+  searchSelected.value = 0;
+  await nextTick();
+  searchInput.value?.focus();
+}
+
+async function exitSearch(): Promise<void> {
+  searchMode.value = false;
+  await nextTick();
+  tree.value?.focus();
+  void revealSelected();
+}
+
+async function revealSearchSelected(): Promise<void> {
+  await nextTick();
+  const row = searchRows.value[searchIndex.value];
+  if (row === undefined) return;
+  document.getElementById(searchItemId(row.entry.path))?.scrollIntoView({
+    block: "nearest",
+  });
+}
+
+function handleSearchKeydown(event: KeyboardEvent): void {
+  if (event.key === "Tab") {
+    event.preventDefault();
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    void exitSearch();
+    return;
+  }
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const direction = event.key === "ArrowDown" ? 1 : -1;
+    searchSelected.value = Math.min(
+      Math.max(0, searchRows.value.length - 1),
+      Math.max(0, searchIndex.value + direction),
+    );
+    void revealSearchSelected();
+    return;
+  }
+  if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    searchSelected.value = event.key === "Home"
+      ? 0
+      : Math.max(0, searchRows.value.length - 1);
+    void revealSearchSelected();
+    return;
+  }
+  if (event.key === "Enter") {
+    event.preventDefault();
+    const row = searchRows.value[searchIndex.value];
+    if (row !== undefined) activate(row.entry);
+  }
+}
+
 function handleKeydown(event: KeyboardEvent): void {
   const current = visibleEntries.value[selectedIndex.value];
   if (event.key === "Tab") {
@@ -187,6 +324,13 @@ function handleKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
     event.preventDefault();
     emit("close");
+    return;
+  }
+  if (
+    event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey
+  ) {
+    event.preventDefault();
+    void enterSearch();
     return;
   }
   if (current === undefined) return;
@@ -258,6 +402,10 @@ function ancestorsOf(path: string): string[] {
 function itemId(path: string): string {
   return `markd-tree-item-${encodeURIComponent(path)}`;
 }
+
+function searchItemId(path: string): string {
+  return `markd-search-item-${encodeURIComponent(path)}`;
+}
 </script>
 
 <template>
@@ -273,9 +421,13 @@ function itemId(path: string): string {
           <p class="tree-dialog-eyebrow">Workspace</p>
           <h2 id="tree-dialog-title">Open a file</h2>
         </div>
-        <span class="tree-dialog-key" aria-hidden="true">Esc</span>
+        <div class="tree-dialog-keys" aria-hidden="true">
+          <span v-if="!searchMode" class="tree-dialog-key">/</span>
+          <span class="tree-dialog-key">Esc</span>
+        </div>
       </header>
       <div
+        v-if="!searchMode"
         ref="tree"
         class="file-tree"
         role="tree"
@@ -318,6 +470,69 @@ function itemId(path: string): string {
         <p v-if="visibleEntries.length === 0" class="file-tree-empty">
           No eligible files in this workspace.
         </p>
+      </div>
+      <div v-else class="file-search">
+        <input
+          ref="searchInput"
+          v-model="query"
+          class="file-search-input"
+          type="text"
+          role="combobox"
+          aria-label="Search files"
+          aria-autocomplete="list"
+          aria-expanded="true"
+          aria-controls="markd-search-list"
+          :aria-activedescendant="searchActiveId"
+          placeholder="Search files"
+          @keydown="handleSearchKeydown"
+        />
+        <div
+          id="markd-search-list"
+          class="file-search-list"
+          role="listbox"
+          aria-label="Matching files"
+        >
+          <button
+            v-for="(row, index) in searchRows"
+            :id="searchItemId(row.entry.path)"
+            :key="row.entry.path"
+            class="file-tree-item file-search-item"
+            :class="{ 'file-tree-item-selected': index === searchIndex }"
+            type="button"
+            tabindex="-1"
+            role="option"
+            :aria-selected="index === searchIndex"
+            :style="{ '--tree-level': 1 }"
+            @mousedown.prevent
+            @mouseenter="searchSelected = index"
+            @click="activate(row.entry)"
+          >
+            <svg
+              class="file-tree-icon"
+              viewBox="0 0 24 24"
+              :style="{ color: row.icon.color }"
+              aria-hidden="true"
+            >
+              <path :d="row.icon.body" fill="currentColor" />
+              <path v-if="row.icon.detail" :d="row.icon.detail" fill="var(--color-surface)" />
+            </svg>
+            <span class="file-tree-name">
+              <template v-for="(segment, i) in row.nameSegments" :key="i">
+                <span v-if="segment.hl" class="file-search-hl">{{ segment.text }}</span>
+                <template v-else>{{ segment.text }}</template>
+              </template>
+            </span>
+            <span v-if="row.dirname !== ''" class="file-search-dir">
+              <template v-for="(segment, i) in row.dirSegments" :key="i">
+                <span v-if="segment.hl" class="file-search-hl">{{ segment.text }}</span>
+                <template v-else>{{ segment.text }}</template>
+              </template>
+            </span>
+          </button>
+          <p v-if="searchRows.length === 0" class="file-tree-empty">
+            No files match "{{ query }}".
+          </p>
+        </div>
       </div>
     </section>
   </div>
