@@ -36,12 +36,11 @@ const searchSelected = ref(0);
 const searchInput = ref<HTMLInputElement>();
 let returnFocus: HTMLElement | null = null;
 
-const selectedValue = computed<string[]>({
-  get: () => selectedPath.value === null ? [] : [selectedPath.value],
-  set: (value) => {
-    selectedPath.value = value[0] ?? null;
-  },
-});
+const selectedValue = computed(() =>
+  props.currentPath !== null && hasPath(props.entries, props.currentPath)
+    ? [props.currentPath]
+    : []
+);
 
 const collection = computed(() =>
   createTreeCollection<WorkspaceEntry>({
@@ -313,7 +312,7 @@ function searchItemId(path: string): string {
         <TreeView.Root
           v-if="entries.length > 0"
           v-model:expanded-value="expandedValue"
-          v-model:selected-value="selectedValue"
+          :selected-value="selectedValue"
           :collection="collection"
           class="file-tree-root"
         >
