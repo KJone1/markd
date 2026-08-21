@@ -23,8 +23,9 @@ function contrast(foreground: string, background: string): number {
 }
 
 Deno.test("primary action colors meet the design system contrast requirement", async () => {
+  const app = await Deno.readTextFile("src/App.vue");
   const stylesheet = await Deno.readTextFile("src/styles.css");
-  const action = stylesheet.match(/\.primary-action\s*\{([^}]+)\}/)?.[1];
+  const action = app.match(/\.primary-action\s*\{([^}]+)\}/)?.[1];
   const backgroundToken = action?.match(/background:\s*var\((--[a-z-]+)\)/)
     ?.[1];
   const escapedToken = backgroundToken?.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -36,7 +37,9 @@ Deno.test("primary action colors meet the design system contrast requirement", a
     (action?.match(/color:\s*white\b/i) ? "#ffffff" : undefined);
 
   if (!background || !foreground) {
-    throw new Error("Could not resolve primary action colors from styles.css");
+    throw new Error(
+      "Could not resolve primary action colors from App.vue and styles.css",
+    );
   }
 
   const ratio = contrast(foreground, background);

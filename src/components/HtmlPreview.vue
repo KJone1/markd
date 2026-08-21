@@ -307,3 +307,62 @@ onBeforeUnmount(() => {
     </div>
   </section>
 </template>
+
+<style scoped>
+.html-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+}
+
+.html-preview-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  border: 0;
+  background: var(--color-surface);
+}
+
+.html-preview-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: var(--color-muted);
+  background: var(--color-canvas);
+  font-size: 14px;
+}
+
+.html-preview-error {
+  position: absolute;
+  z-index: 2;
+  top: var(--space-md);
+  left: 50%;
+  width: min(calc(100% - 32px), 640px);
+  display: flex;
+  gap: var(--space-xs);
+  align-items: flex-start;
+  padding: var(--space-md);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 15px -3px rgb(15 23 42 / 16%);
+  font-size: 14px;
+  line-height: 1.5;
+  transform: translateX(-50%);
+}
+
+.html-preview-error-icon {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: white;
+  background: var(--color-error);
+  border-radius: 9999px;
+  font-weight: 700;
+}
+</style>

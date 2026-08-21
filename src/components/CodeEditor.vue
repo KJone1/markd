@@ -65,3 +65,11 @@ onBeforeUnmount(() => {
     :aria-label="`Editing ${path}`"
   />
 </template>
+
+<style scoped>
+.code-editor {
+  width: 100%;
+  height: 100%;
+  background: var(--color-surface);
+}
+</style>

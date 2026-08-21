@@ -395,3 +395,371 @@ onBeforeUnmount(destroyEditor);
     :aria-label="`Markdown editor for ${path}`"
   />
 </template>
+
+<style scoped>
+.markdown-editor {
+  width: 100%;
+  height: 100%;
+  overflow: hidden auto;
+  color: var(--color-body);
+  background: var(--color-canvas);
+  scroll-behavior: smooth;
+}
+
+/* Everything below is rendered by Milkdown plugins and src/editor/*.ts, never in this template. */
+.markdown-editor :deep(.milkdown) {
+  min-height: 100%;
+  --crepe-base-font-size: 16px;
+  --crepe-color-background: var(--color-surface);
+  --crepe-color-on-background: var(--color-body);
+  --crepe-color-surface: var(--color-hairline-soft);
+  --crepe-color-surface-low: var(--color-hairline);
+  --crepe-color-on-surface: var(--color-ink);
+  --crepe-color-on-surface-variant: var(--color-muted);
+  --crepe-color-outline: var(--color-muted);
+  --crepe-color-primary: var(--color-primary);
+  --crepe-color-secondary: var(--color-hairline);
+  --crepe-color-on-secondary: var(--color-ink);
+  --crepe-color-inverse: var(--color-ink);
+  --crepe-color-on-inverse: var(--color-surface);
+  --crepe-color-inline-code: #b91c1c;
+  --crepe-color-error: var(--color-error);
+  --crepe-color-hover: var(--color-hairline-soft);
+  --crepe-color-selected: #bfdbfe;
+  --crepe-color-inline-area: var(--color-hairline);
+  --crepe-font-title: "Cal Sans", Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  --crepe-font-default: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  --crepe-font-code: "JetBrains Mono", ui-monospace, monospace;
+  --crepe-shadow-1: 0 4px 12px rgb(15 23 42 / 8%);
+  --crepe-shadow-2: 0 10px 15px -3px rgb(15 23 42 / 12%);
+}
+
+.markdown-editor :deep(.milkdown .milkdown-top-bar) {
+  padding: 0 var(--space-md);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.markdown-editor :deep(.milkdown .milkdown-top-bar .top-bar-divider) {
+  background: var(--color-hairline);
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror) {
+  width: 100%;
+  min-height: 100%;
+  padding: var(--space-xxl);
+  color: var(--color-body);
+  caret-color: var(--color-primary-active);
+  overflow-wrap: anywhere;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror > *) {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror:focus-visible) {
+  outline: none;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror h1),
+.markdown-editor :deep(.milkdown .ProseMirror h2),
+.markdown-editor :deep(.milkdown .ProseMirror h3),
+.markdown-editor :deep(.milkdown .ProseMirror h4),
+.markdown-editor :deep(.milkdown .ProseMirror h5),
+.markdown-editor :deep(.milkdown .ProseMirror h6) {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror h1) {
+  font-size: 36px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror h2) {
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror h3) {
+  font-size: 22px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror h4),
+.markdown-editor :deep(.milkdown .ProseMirror h5),
+.markdown-editor :deep(.milkdown .ProseMirror h6) {
+  font-size: 18px;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror p),
+.markdown-editor :deep(.milkdown .ProseMirror li),
+.markdown-editor :deep(.milkdown .ProseMirror blockquote) {
+  line-height: 1.5;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror :lang(he)) {
+  line-height: 1.65;
+}
+
+.markdown-editor :deep(.milkdown .ProseMirror table) {
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block) {
+  margin: var(--space-md) 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  --crepe-color-surface: #282c34;
+  --crepe-color-surface-low: #21252b;
+  --crepe-color-on-surface: #e6e6e6;
+  --crepe-color-on-surface-variant: #abb2bf;
+  --crepe-color-secondary: #3a4149;
+  --crepe-color-hover: #3a4149;
+  --crepe-color-outline: #6b7280;
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .milkdown-code-block-placeholder) {
+  color: var(--crepe-color-on-surface-variant);
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .codemirror-host),
+.markdown-editor :deep(.milkdown .milkdown-code-block .cm-editor) {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .cm-scroller) {
+  overflow-x: auto;
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .cm-scroller::-webkit-scrollbar) {
+  height: 6px;
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .cm-scroller::-webkit-scrollbar-track) {
+  background: transparent;
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .cm-scroller::-webkit-scrollbar-thumb) {
+  background: rgb(255 255 255 / 20%);
+  border-radius: 9999px;
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .cm-scroller::-webkit-scrollbar-thumb:hover) {
+  background: rgb(255 255 255 / 35%);
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .cm-line) {
+  white-space: pre;
+}
+
+.markdown-editor :deep(.milkdown button),
+.markdown-editor :deep(.milkdown input) {
+  border-radius: var(--radius-md);
+}
+
+.markdown-editor :deep(.milkdown button:focus-visible),
+.markdown-editor :deep(.milkdown input:focus-visible),
+.markdown-editor :deep(.milkdown [role="button"]:focus-visible),
+.markdown-editor :deep(.milkdown [role="slider"]:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.markdown-editor :deep(.prompt-section) {
+  margin: var(--space-lg) 0;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 5%);
+}
+
+.markdown-editor :deep(.prompt-section .prompt-section) {
+  margin: var(--space-md) 0;
+  background: var(--color-canvas);
+}
+
+.markdown-editor :deep(.prompt-section-opening) {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-xs) var(--space-md);
+  color: var(--color-muted);
+  background: var(--color-hairline-soft);
+  border-bottom: 1px solid var(--color-hairline);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.markdown-editor :deep(.prompt-section-closing) {
+  display: none;
+}
+
+.markdown-editor :deep(.prompt-section-name) {
+  min-width: 7ch;
+  width: calc(var(--prompt-name-length, 12) * 1ch);
+  max-width: 40ch;
+  padding: 2px 0;
+  color: var(--color-ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.markdown-editor :deep(.prompt-section-name:hover) {
+  border-bottom-color: var(--color-hairline);
+}
+
+.markdown-editor :deep(.prompt-section-content) {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.markdown-editor :deep(.prompt-section-collapse) {
+  min-height: 28px;
+  margin-left: auto;
+  padding: 4px var(--space-xs);
+  color: var(--color-muted);
+  background: transparent;
+  border: 1px solid var(--color-hairline);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.markdown-editor :deep(.prompt-section-collapse:hover) {
+  color: var(--color-ink);
+  background: var(--color-surface);
+}
+
+.markdown-editor :deep(.prompt-section[data-prompt-collapsed="true"] > .prompt-section-content),
+.markdown-editor :deep(.prompt-section[data-prompt-collapsed="true"] > .prompt-section-closing) {
+  display: none;
+}
+
+.markdown-editor :deep(.html-block) {
+  margin: var(--space-md) 0;
+}
+
+.markdown-editor :deep(.html-block img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-editor :deep(.html-block-source) {
+  margin: 0;
+  padding: var(--space-xs) var(--space-md);
+  color: var(--color-muted);
+  background: var(--color-hairline-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.markdown-editor :deep(.html-section) {
+  margin: var(--space-md) 0;
+}
+
+.markdown-editor :deep(.html-section[align="center"]),
+.markdown-editor :deep(.html-block-rendered [align="center"]) {
+  text-align: center;
+}
+
+.markdown-editor :deep(.html-section[align="right"]),
+.markdown-editor :deep(.html-block-rendered [align="right"]) {
+  text-align: right;
+}
+
+.markdown-editor :deep(.frontmatter-label) {
+  font-weight: 600;
+  cursor: default;
+}
+
+.markdown-editor :deep(.frontmatter-entries) {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+}
+
+.markdown-editor :deep(.frontmatter-key) {
+  color: var(--color-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.markdown-editor :deep(.frontmatter-value) {
+  margin: 0;
+  color: var(--color-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.markdown-editor :deep(.frontmatter-empty) {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.markdown-editor :deep(.footnote-reference),
+.markdown-editor :deep(.footnote-definition) {
+  transition: background 300ms ease, box-shadow 300ms ease;
+}
+
+.markdown-editor :deep(.footnote-definition) {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0 var(--space-xs);
+  margin: var(--space-xs) 0;
+  font-size: 14px;
+}
+
+.markdown-editor :deep(.footnote-definition > dt) {
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown-editor :deep(.footnote-definition > dd) {
+  min-width: 0;
+  margin: 0;
+}
+
+.markdown-editor :deep(.footnote-jump) {
+  padding: 0;
+  color: var(--color-primary-active);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.markdown-editor :deep(.footnote-jump:hover) {
+  color: var(--color-primary-pressed);
+}
+
+.markdown-editor :deep([data-footnote-flash="true"]) {
+  border-radius: var(--radius-md);
+  background: rgb(59 130 246 / 14%);
+  box-shadow: 0 0 0 4px rgb(59 130 246 / 14%);
+}
+
+@media (max-width: 760px) {
+  .markdown-editor :deep(.milkdown .ProseMirror) {
+    padding: var(--space-xxl) var(--space-md);
+  }
+}
+</style>

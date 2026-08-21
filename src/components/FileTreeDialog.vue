@@ -400,3 +400,207 @@ function searchItemId(path: string): string {
     </section>
   </div>
 </template>
+
+<style scoped>
+.tree-dialog-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-md);
+  background: rgb(15 23 42 / 32%);
+}
+
+.tree-dialog {
+  width: min(100%, 640px);
+  max-height: min(720px, calc(100vh - 32px));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 32px rgb(15 23 42 / 16%);
+}
+
+.tree-dialog:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.tree-dialog-header {
+  min-height: 72px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.tree-dialog-header h2 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.tree-dialog-eyebrow {
+  margin: 0 0 4px;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tree-dialog-keys {
+  display: flex;
+  gap: 6px;
+}
+
+.tree-dialog-key {
+  min-width: 40px;
+  padding: 4px 8px;
+  color: var(--color-muted);
+  background: var(--color-hairline-soft);
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.file-tree {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  outline: none;
+}
+
+.file-tree-root {
+  --tree-item-gap: 0.5rem;
+  --tree-indentation: 1rem;
+  --tree-padding-inline: 0.75rem;
+  --tree-padding-block: 0.375rem;
+  --tree-icon-size: 1rem;
+  --tree-chevron-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  color: var(--color-ink);
+}
+
+.file-tree-list {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.file-tree-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--color-muted);
+}
+
+.file-tree-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-tree-empty {
+  margin: 0;
+  padding: var(--space-lg);
+  color: var(--color-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.file-search {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-search-input {
+  margin: 8px 8px 0;
+  padding: 8px 12px;
+  color: var(--color-ink);
+  background: transparent;
+  border: 1px solid var(--color-hairline);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.file-search-input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.file-search-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+}
+
+.file-search-item {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  color: var(--color-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-search-item-selected {
+  background: var(--color-hairline-soft);
+}
+
+.file-search-item .file-tree-name {
+  flex: 0 0 auto;
+}
+
+.file-search-dir {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.file-search-hl {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+</style>
