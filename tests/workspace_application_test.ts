@@ -440,12 +440,17 @@ Deno.test("only the focused window writes the shared application menu", async ()
 class FakeWindow {
   menu: ApplicationMenuItem[] = [];
   executedSources: string[] = [];
+  title = "Markd";
   private menuClickListener:
     | ((event: Event & { detail?: { id?: string } }) => void)
     | null = null;
 
   setApplicationMenu(menu: ApplicationMenuItem[]): void {
     this.menu = menu;
+  }
+
+  setTitle(title: string): void {
+    this.title = title;
   }
 
   addEventListener(

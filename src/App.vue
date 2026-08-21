@@ -6,6 +6,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  watchEffect,
 } from "vue";
 import ErrorToast from "./components/ErrorToast.vue";
 import FileTreeDialog from "./components/FileTreeDialog.vue";
@@ -16,6 +17,10 @@ import type {
   AppInfo,
   WorkspaceNavigation,
   WorkspaceState,
+} from "./shared/desktop.ts";
+import {
+  workspaceFolderName,
+  workspaceWindowTitle,
 } from "./shared/desktop.ts";
 
 const CodeEditor = defineAsyncComponent(
@@ -44,7 +49,15 @@ const htmlReloadKey = ref(0);
 let documentSession: DocumentSession | null = null;
 const workspaceName = computed(() => {
   const path = workspace.value.activePath;
-  return path?.split("/").filter(Boolean).at(-1) ?? null;
+  return path === null ? null : workspaceFolderName(path);
+});
+
+watchEffect(() => {
+  if (appInfo.value === undefined) return;
+  document.title = workspaceWindowTitle(
+    workspace.value.activePath,
+    navigation.value.activeFile?.path ?? null,
+  );
 });
 
 function copyActivePath(): void {

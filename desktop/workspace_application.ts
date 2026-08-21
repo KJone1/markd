@@ -6,6 +6,7 @@ import type {
   WorkspaceNavigation,
   WorkspaceState,
 } from "../src/shared/desktop.ts";
+import { workspaceWindowTitle } from "../src/shared/desktop.ts";
 import {
   basename,
   dirname,
@@ -35,6 +36,7 @@ export interface WorkspaceWindow {
     listener: (event: Event & { detail?: { id?: string } }) => void,
   ): void;
   executeJs(source: string): Promise<unknown>;
+  setTitle(title: string): void;
 }
 
 export type FolderPicker = () => Promise<string | null>;
@@ -126,6 +128,7 @@ export class WorkspaceApplication {
     this.activeFile = await this.files.open(path);
     await this.settings.rememberActiveFile(this.files.root.path, path);
     await this.refreshMenu(this.recentWorkspaces);
+    this.refreshTitle();
     return this.activeFile;
   }
 
@@ -349,6 +352,7 @@ export class WorkspaceApplication {
       this.files = null;
       this.documents = null;
       this.activeFile = null;
+      this.refreshTitle();
       return;
     }
 
@@ -356,13 +360,23 @@ export class WorkspaceApplication {
     this.documents = new WorkspaceDocuments(root);
     this.activeFile = null;
     const rememberedPath = (await this.settings.load()).activeFiles[root.path];
-    if (rememberedPath === undefined) return;
-
-    try {
-      this.activeFile = await this.files.open(rememberedPath);
-    } catch {
-      this.activeFile = null;
+    if (rememberedPath !== undefined) {
+      try {
+        this.activeFile = await this.files.open(rememberedPath);
+      } catch {
+        this.activeFile = null;
+      }
     }
+    this.refreshTitle();
+  }
+
+  private refreshTitle(): void {
+    this.window.setTitle(
+      workspaceWindowTitle(
+        this.controller.active?.path ?? null,
+        this.activeFile?.path ?? null,
+      ),
+    );
   }
 
   private startWatching(): void {
@@ -385,6 +399,7 @@ export class WorkspaceApplication {
         this.activeFile = null;
       }
     }
+    this.refreshTitle();
     await this.refreshMenu(this.recentWorkspaces);
     await this.notifyNavigation({
       rootPath: watchedFiles.root.path,

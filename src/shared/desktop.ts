@@ -91,6 +91,20 @@ export interface DesktopBindings {
   openFolder(): Promise<WorkspaceState & { opened: boolean }>;
 }
 
+export function workspaceFolderName(path: string): string {
+  return path.split("/").filter(Boolean).at(-1) ?? path;
+}
+
+export function workspaceWindowTitle(
+  rootPath: string | null,
+  activeFilePath: string | null,
+): string {
+  if (rootPath === null) return "Markd";
+  const folder = workspaceFolderName(rootPath);
+  if (activeFilePath === null) return folder;
+  return `${workspaceFolderName(activeFilePath)} - ${folder}`;
+}
+
 declare global {
   const bindings: DesktopBindings;
 
