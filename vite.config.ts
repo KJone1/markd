@@ -48,7 +48,7 @@ export default defineConfig({
           if (components) return `vendor-milkdown-components-${components[1]}`;
 
           const vendor = id.match(
-            /\/node_modules\/(fuzzysort|katex|codemirror|prosemirror-[a-z-]+|@codemirror\/[a-z0-9-]+|@milkdown\/[a-z0-9-]+)\//,
+            /\/node_modules\/(fuzzysort|katex|codemirror|prosemirror-[a-z-]+|@codemirror\/[a-z0-9-]+|@milkdown\/[a-z0-9-]+|@ark-ui\/[a-z0-9-]+|@zag-js\/[a-z0-9-]+|@internationalized\/[a-z0-9-]+)\//,
           );
           if (vendor) {
             return `vendor-${vendor[1].replace(/^@/, "").replace(/\//g, "-")}`;
@@ -60,5 +60,12 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // @ark-ui/vue must share the app's Vue instance; externalized it loads
+    // a second @vue/runtime-core copy and renderSlot crashes.
+    server: {
+      deps: {
+        inline: [/@ark-ui\//, /@zag-js\//, /@internationalized\//],
+      },
+    },
   },
 });
