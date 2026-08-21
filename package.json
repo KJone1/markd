@@ -8,6 +8,7 @@
     "test:web": "vitest run"
   },
   "dependencies": {
+    "@ark-ui/vue": "^5.38.2",
     "@milkdown/crepe": "^7.22.1",
     "@milkdown/kit": "^7.22.1",
     "fuzzysort": "^3.1.0",
