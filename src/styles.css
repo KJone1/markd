@@ -986,7 +986,6 @@ button {
   cursor: pointer;
 }
 
-.file-tree-branch-control:hover,
 .file-tree-branch-control[data-focus] {
   background: var(--color-hairline-soft);
 }
@@ -997,7 +996,6 @@ button {
 }
 
 .file-tree-branch-control[data-selected] {
-  background: var(--color-hairline-soft);
   color: var(--color-primary-active);
 }
 
@@ -1089,7 +1087,6 @@ button {
   cursor: pointer;
 }
 
-.file-tree-item:hover,
 .file-tree-item[data-focus] {
   background: var(--color-hairline-soft);
 }
@@ -1100,7 +1097,6 @@ button {
 }
 
 .file-tree-item[data-selected] {
-  background: var(--color-hairline-soft);
   color: var(--color-primary-active);
 }
 
