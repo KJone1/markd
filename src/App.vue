@@ -8,6 +8,7 @@ import {
   ref,
   watchEffect,
 } from "vue";
+import { Dialog } from "@ark-ui/vue/dialog";
 import ErrorToast from "./components/ErrorToast.vue";
 import FileTreeDialog from "./components/FileTreeDialog.vue";
 import HtmlPreview from "./components/HtmlPreview.vue";
@@ -354,26 +355,37 @@ onBeforeUnmount(() => {
       @open-file="openFile"
     />
 
-    <section
+    <Dialog.Root
       v-if="diskConflict"
-      class="conflict-dialog"
+      :open="diskConflict"
       role="alertdialog"
-      aria-labelledby="conflict-title"
-      aria-describedby="conflict-description"
+      :close-on-escape="false"
+      :close-on-interact-outside="false"
     >
-      <h2 id="conflict-title">This file changed on disk</h2>
-      <p id="conflict-description">
-        Reload the disk version or overwrite it with the complete local buffer.
-      </p>
-      <div class="conflict-actions">
-        <button type="button" class="secondary-action" @click="reloadConflict">
-          Reload from disk
-        </button>
-        <button type="button" class="primary-action" @click="overwriteConflict">
-          Overwrite with local
-        </button>
-      </div>
-    </section>
+      <Dialog.Positioner class="conflict-dialog-positioner">
+        <Dialog.Content class="conflict-dialog">
+          <Dialog.Title>This file changed on disk</Dialog.Title>
+          <Dialog.Description as-child>
+            <p>
+              Reload the disk version or overwrite it with the complete local buffer.
+            </p>
+          </Dialog.Description>
+          <div class="conflict-actions">
+            <button
+              type="button"
+              class="secondary-action"
+              data-autofocus
+              @click="reloadConflict"
+            >
+              Reload from disk
+            </button>
+            <button type="button" class="primary-action" @click="overwriteConflict">
+              Overwrite with local
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Positioner>
+    </Dialog.Root>
 
     <ErrorToast
       v-if="saveError"
@@ -484,10 +496,15 @@ onBeforeUnmount(() => {
   padding: 0;
 }
 
-.conflict-dialog {
+.conflict-dialog-positioner {
   position: fixed;
   z-index: 40;
-  inset: 50% auto auto 50%;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.conflict-dialog {
   width: min(calc(100% - 32px), 480px);
   padding: var(--space-lg);
   color: var(--color-body);
@@ -495,7 +512,6 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-lg);
   box-shadow: 0 16px 32px rgb(15 23 42 / 16%);
-  transform: translate(-50%, -50%);
 }
 
 .conflict-dialog h2 {

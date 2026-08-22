@@ -75,8 +75,10 @@ beforeEach(() => {
   editorWiring.codeResolvers.length = 0;
 });
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  await Promise.resolve();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -166,7 +168,8 @@ describe("Markd shell", () => {
       .toBeTruthy();
     expect(screen.queryByText(/route is ready for its editor/i)).toBeNull();
     expect(screen.queryByTitle(/Previewing/)).toBeNull();
-    expect(screen.queryByRole("heading", { name: "guide.markdown" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "guide.markdown" }))
+      .toBeNull();
     expect(screen.queryByText("guide.markdown", { selector: ".document-path" }))
       .toBeNull();
   });
@@ -179,7 +182,11 @@ describe("Markd shell", () => {
       }),
       getWorkspaceNavigation: vi.fn().mockResolvedValue({
         rootPath: "/Users/example/Notes",
-        entries: [{ kind: "file", name: "guide.markdown", path: "guide.markdown" }],
+        entries: [{
+          kind: "file",
+          name: "guide.markdown",
+          path: "guide.markdown",
+        }],
         activeFile: {
           kind: "markdown",
           path: "guide.markdown",
@@ -207,7 +214,11 @@ describe("Markd shell", () => {
       }),
       getWorkspaceNavigation: vi.fn().mockResolvedValue({
         rootPath: "/Users/example/Notes",
-        entries: [{ kind: "file", name: "photo.png", path: "assets/photo.png" }],
+        entries: [{
+          kind: "file",
+          name: "photo.png",
+          path: "assets/photo.png",
+        }],
         activeFile: {
           kind: "information",
           path: "assets/photo.png",
@@ -272,6 +283,7 @@ describe("Markd shell", () => {
   });
 
   it("uses the shared external-change conflict lifecycle for Markdown", async () => {
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(100);
     vi.stubGlobal("bindings", {
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
@@ -292,6 +304,7 @@ describe("Markd shell", () => {
       name: "Editing note.md",
     });
     await fireEvent.update(editor, "# Local");
+    editor.focus();
     globalThis.dispatchEvent(
       new CustomEvent("markd-files-change", {
         detail: {
@@ -302,17 +315,34 @@ describe("Markd shell", () => {
       }),
     );
 
-    expect(
-      await screen.findByRole("alertdialog", {
-        name: "This file changed on disk",
-      }),
-    ).toBeTruthy();
+    const conflict = await screen.findByRole("alertdialog", {
+      name: "This file changed on disk",
+    });
+    expect(conflict.getAttribute("aria-modal")).toBe("true");
     expect((editor as HTMLTextAreaElement).value).toBe("# Local");
-    await fireEvent.click(
-      screen.getByRole("button", { name: "Reload from disk" }),
+    const reload = screen.getByRole("button", { name: "Reload from disk" });
+    await waitFor(() => expect(document.activeElement).toBe(reload));
+    await waitFor(() =>
+      expect(document.body.hasAttribute("data-inert")).toBe(true)
     );
+
+    await fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.getByRole("alertdialog")).toBe(conflict);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await fireEvent.pointerDown(conflict.parentElement!, {
+      pointerType: "mouse",
+      clientX: 0,
+      clientY: 0,
+    });
+    expect(screen.getByRole("alertdialog")).toBe(conflict);
+
+    await fireEvent.click(reload);
     expect((editor as HTMLTextAreaElement).value).toBe("# Disk");
     expect(screen.queryByRole("alertdialog")).toBeNull();
+    await waitFor(() =>
+      expect(document.body.hasAttribute("data-inert")).toBe(false)
+    );
+    await waitFor(() => expect(document.activeElement).toBe(editor));
   });
 
   it("keeps one Markdown editor mounted while active files change", async () => {
@@ -376,14 +406,19 @@ describe("Markd shell", () => {
         detail: {
           rootPath: "/Users/example/Notes",
           entries: [],
-          activeFile: { kind: "markdown", path: "third.md", content: "# Third" },
+          activeFile: {
+            kind: "markdown",
+            path: "third.md",
+            content: "# Third",
+          },
         },
       }),
     );
     expect(await screen.findByRole("textbox", { name: "Editing third.md" }))
       .toBeTruthy();
     expect(markdownLifecycle).toEqual({ mounted: 3, unmounted: 2 });
-    expect(screen.queryByRole("textbox", { name: "Editing app.ts" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Editing app.ts" }))
+      .toBeNull();
   });
 
   it("replaces the Markdown editor when another workspace has the same relative path", async () => {

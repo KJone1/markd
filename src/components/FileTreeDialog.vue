@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import fuzzysort from "fuzzysort";
+import { Dialog } from "@ark-ui/vue/dialog";
 import { createTreeCollection, TreeView } from "@ark-ui/vue/tree-view";
 import FileTreeNode from "./FileTreeNode.vue";
 import type { WorkspaceEntry } from "../shared/desktop.ts";
@@ -34,7 +35,6 @@ const searchMode = ref(false);
 const query = ref("");
 const searchSelected = ref(0);
 const searchInput = ref<HTMLInputElement>();
-let returnFocus: HTMLElement | null = null;
 
 const selectedValue = computed(() =>
   props.currentPath !== null && hasPath(props.entries, props.currentPath)
@@ -74,22 +74,12 @@ const searchActiveId = computed(() => {
 
 watch(
   () => props.open,
-  (open, wasOpen) => {
+  (open) => {
     if (open) {
-      if (!wasOpen) {
-        returnFocus = document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
-      }
       searchMode.value = false;
       query.value = "";
       selectCurrentOrRoot();
-      void revealSelected();
-      return;
-    }
-    if (wasOpen) {
-      returnFocus?.focus();
-      returnFocus = null;
+      void scrollSelectedIntoView();
     }
   },
   { immediate: true },
@@ -100,7 +90,7 @@ watch(
   () => {
     if (!props.open || searchMode.value) return;
     selectCurrentOrRoot();
-    void revealSelected();
+    void scrollSelectedIntoView();
   },
 );
 
@@ -109,7 +99,7 @@ watch(
   () => {
     if (!props.open || searchMode.value) return;
     selectCurrentOrRoot();
-    void revealSelected();
+    void scrollSelectedIntoView();
   },
 );
 
@@ -134,21 +124,20 @@ function selectCurrentOrRoot(): void {
   }
 }
 
-async function revealSelected(): Promise<void> {
-  await nextTick();
+function selectedElement(): HTMLElement | null {
   const pane = treePane.value;
-  if (pane === undefined) return;
+  if (pane === undefined) return null;
   const path = selectedPath.value;
-  const target = path === null ? null : pane.querySelector<HTMLElement>(
+  if (path === null) return pane;
+  return pane.querySelector<HTMLElement>(
     `[data-part="branch-control"][data-value="${CSS.escape(path)}"], ` +
       `[data-part="item"][data-value="${CSS.escape(path)}"]`,
-  );
-  if (target === null) {
-    pane.focus();
-    return;
-  }
-  target.focus({ preventScroll: true });
-  target.scrollIntoView({ block: "nearest" });
+  ) ?? pane;
+}
+
+async function scrollSelectedIntoView(): Promise<void> {
+  await nextTick();
+  selectedElement()?.scrollIntoView?.({ block: "nearest" });
 }
 
 function activateFile(path: string): void {
@@ -202,7 +191,9 @@ async function enterSearch(): Promise<void> {
 
 async function exitSearch(): Promise<void> {
   searchMode.value = false;
-  await revealSelected();
+  await nextTick();
+  selectedElement()?.focus({ preventScroll: true });
+  selectedElement()?.scrollIntoView?.({ block: "nearest" });
 }
 
 async function revealSearchSelected(): Promise<void> {
@@ -215,15 +206,6 @@ async function revealSearchSelected(): Promise<void> {
 }
 
 function handleSearchKeydown(event: KeyboardEvent): void {
-  if (event.key === "Tab") {
-    event.preventDefault();
-    return;
-  }
-  if (event.key === "Escape") {
-    event.preventDefault();
-    void exitSearch();
-    return;
-  }
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     const direction = event.key === "ArrowDown" ? 1 : -1;
@@ -250,19 +232,22 @@ function handleSearchKeydown(event: KeyboardEvent): void {
 }
 
 function handleTreeKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    emit("close");
-    return;
-  }
   if (
     event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey
   ) {
     event.preventDefault();
     void enterSearch();
-    return;
   }
-  if (event.key === "Tab") event.preventDefault();
+}
+
+function handleEscape(event: KeyboardEvent): void {
+  if (!searchMode.value) return;
+  event.preventDefault();
+  void exitSearch();
+}
+
+function handleOpenChange(details: { open: boolean }): void {
+  if (!details.open) emit("close");
 }
 
 function hasPath(entries: WorkspaceEntry[], path: string): boolean {
@@ -285,120 +270,123 @@ function searchItemId(path: string): string {
 </script>
 
 <template>
-  <div v-show="open" class="tree-dialog-backdrop" @mousedown.self="emit('close')">
-    <section
-      class="tree-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="tree-dialog-title"
-    >
-      <header class="tree-dialog-header">
-        <div>
-          <p class="tree-dialog-eyebrow">Workspace</p>
-          <h2 id="tree-dialog-title">Open a file</h2>
-        </div>
-        <div class="tree-dialog-keys" aria-hidden="true">
-          <span v-if="!searchMode" class="tree-dialog-key">/</span>
-          <span class="tree-dialog-key">Esc</span>
-        </div>
-      </header>
-      <div
-        v-if="!searchMode"
-        ref="treePane"
-        class="file-tree"
-        tabindex="-1"
-        @keydown.capture="handleTreeKeydown"
-      >
-        <TreeView.Root
-          v-if="entries.length > 0"
-          v-model:expanded-value="expandedValue"
-          :selected-value="selectedValue"
-          :collection="collection"
-          class="file-tree-root"
-        >
-          <TreeView.Label class="visually-hidden">Workspace files</TreeView.Label>
-          <TreeView.Tree class="file-tree-list">
-            <FileTreeNode
-              v-for="(node, index) in entries"
-              :key="node.path"
-              :node="node"
-              :index-path="[index]"
-              :on-file-open="activateFile"
-            />
-          </TreeView.Tree>
-        </TreeView.Root>
-        <p v-else class="file-tree-empty">
-          No eligible files in this workspace.
-        </p>
-      </div>
-      <div v-else class="file-search">
-        <input
-          ref="searchInput"
-          v-model="query"
-          class="file-search-input"
-          type="text"
-          role="combobox"
-          aria-label="Search files"
-          aria-autocomplete="list"
-          aria-expanded="true"
-          aria-controls="markd-search-list"
-          :aria-activedescendant="searchActiveId"
-          placeholder="Search files"
-          @keydown="handleSearchKeydown"
-        />
+  <Dialog.Root
+    :open="open"
+    :initial-focus-el="selectedElement"
+    @escape-key-down="handleEscape"
+    @open-change="handleOpenChange"
+  >
+    <Dialog.Backdrop class="tree-dialog-backdrop" />
+    <Dialog.Positioner class="tree-dialog-positioner">
+      <Dialog.Content class="tree-dialog">
+        <header class="tree-dialog-header">
+          <div>
+            <p class="tree-dialog-eyebrow">Workspace</p>
+            <Dialog.Title>Open a file</Dialog.Title>
+          </div>
+          <div class="tree-dialog-keys" aria-hidden="true">
+            <span v-if="!searchMode" class="tree-dialog-key">/</span>
+            <span class="tree-dialog-key">Esc</span>
+          </div>
+        </header>
         <div
-          id="markd-search-list"
-          class="file-search-list"
-          role="listbox"
-          aria-label="Matching files"
+          v-if="!searchMode"
+          ref="treePane"
+          class="file-tree"
+          tabindex="-1"
+          @keydown.capture="handleTreeKeydown"
         >
-          <button
-            v-for="(row, index) in searchRows"
-            :id="searchItemId(row.entry.path)"
-            :key="row.entry.path"
-            class="file-search-item"
-            :class="{ 'file-search-item-selected': index === searchIndex }"
-            type="button"
-            tabindex="-1"
-            role="option"
-            :aria-selected="index === searchIndex"
-            @mousedown.prevent
-            @mouseenter="searchSelected = index"
-            @click="activateFile(row.entry.path)"
+          <TreeView.Root
+            v-if="entries.length > 0"
+            v-model:expanded-value="expandedValue"
+            :selected-value="selectedValue"
+            :collection="collection"
+            class="file-tree-root"
           >
-            <svg
-              class="file-tree-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-              <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-            </svg>
-            <span class="file-tree-name">
-              <template v-for="(segment, i) in row.nameSegments" :key="i">
-                <span v-if="segment.hl" class="file-search-hl">{{ segment.text }}</span>
-                <template v-else>{{ segment.text }}</template>
-              </template>
-            </span>
-            <span v-if="row.dirname !== ''" class="file-search-dir">
-              <template v-for="(segment, i) in row.dirSegments" :key="i">
-                <span v-if="segment.hl" class="file-search-hl">{{ segment.text }}</span>
-                <template v-else>{{ segment.text }}</template>
-              </template>
-            </span>
-          </button>
-          <p v-if="searchRows.length === 0" class="file-tree-empty">
-            No files match "{{ query }}".
+            <TreeView.Label class="visually-hidden">Workspace files</TreeView.Label>
+            <TreeView.Tree class="file-tree-list">
+              <FileTreeNode
+                v-for="(node, index) in entries"
+                :key="node.path"
+                :node="node"
+                :index-path="[index]"
+                :on-file-open="activateFile"
+              />
+            </TreeView.Tree>
+          </TreeView.Root>
+          <p v-else class="file-tree-empty">
+            No eligible files in this workspace.
           </p>
         </div>
-      </div>
-    </section>
-  </div>
+        <div v-else class="file-search">
+          <input
+            ref="searchInput"
+            v-model="query"
+            class="file-search-input"
+            type="text"
+            role="combobox"
+            aria-label="Search files"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls="markd-search-list"
+            :aria-activedescendant="searchActiveId"
+            placeholder="Search files"
+            @keydown="handleSearchKeydown"
+          />
+          <div
+            id="markd-search-list"
+            class="file-search-list"
+            role="listbox"
+            aria-label="Matching files"
+          >
+            <button
+              v-for="(row, index) in searchRows"
+              :id="searchItemId(row.entry.path)"
+              :key="row.entry.path"
+              class="file-search-item"
+              :class="{ 'file-search-item-selected': index === searchIndex }"
+              type="button"
+              tabindex="-1"
+              role="option"
+              :aria-selected="index === searchIndex"
+              @mousedown.prevent
+              @mouseenter="searchSelected = index"
+              @click="activateFile(row.entry.path)"
+            >
+              <svg
+                class="file-tree-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+              </svg>
+              <span class="file-tree-name">
+                <template v-for="(segment, i) in row.nameSegments" :key="i">
+                  <span v-if="segment.hl" class="file-search-hl">{{ segment.text }}</span>
+                  <template v-else>{{ segment.text }}</template>
+                </template>
+              </span>
+              <span v-if="row.dirname !== ''" class="file-search-dir">
+                <template v-for="(segment, i) in row.dirSegments" :key="i">
+                  <span v-if="segment.hl" class="file-search-hl">{{ segment.text }}</span>
+                  <template v-else>{{ segment.text }}</template>
+                </template>
+              </span>
+            </button>
+            <p v-if="searchRows.length === 0" class="file-tree-empty">
+              No files match "{{ query }}".
+            </p>
+          </div>
+        </div>
+      </Dialog.Content>
+    </Dialog.Positioner>
+  </Dialog.Root>
 </template>
 
 <style scoped>
@@ -406,15 +394,22 @@ function searchItemId(path: string): string {
   position: fixed;
   z-index: 30;
   inset: 0;
+  background: rgb(15 23 42 / 32%);
+  pointer-events: auto;
+}
+
+.tree-dialog-positioner {
+  position: fixed;
+  z-index: 31;
+  inset: 0;
   display: grid;
   place-items: center;
   padding: var(--space-md);
-  background: rgb(15 23 42 / 32%);
 }
 
 .tree-dialog {
   width: min(100%, 640px);
-  max-height: min(720px, calc(100vh - 32px));
+  height: min(720px, calc(100vh - 32px));
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -423,6 +418,11 @@ function searchItemId(path: string): string {
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-lg);
   box-shadow: 0 16px 32px rgb(15 23 42 / 16%);
+}
+
+.tree-dialog-backdrop[hidden],
+.tree-dialog[hidden] {
+  display: none;
 }
 
 .tree-dialog:focus-visible {
