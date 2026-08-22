@@ -1,5 +1,4 @@
 const OPEN_DELAY = 400;
-const CLOSE_DELAY = 150;
 const GUTTER = 8;
 const ARROW_SIZE = 8;
 const VIEWPORT_PADDING = 8;
@@ -27,19 +26,12 @@ export function createTooltipHost(): TooltipHost {
 
   let openTrigger: HTMLElement | null = null;
   let openTimer: number | null = null;
-  let closeTimer: number | null = null;
   let destroyed = false;
 
   function clearOpenTimer(): void {
     if (openTimer === null) return;
     clearTimeout(openTimer);
     openTimer = null;
-  }
-
-  function clearCloseTimer(): void {
-    if (closeTimer === null) return;
-    clearTimeout(closeTimer);
-    closeTimer = null;
   }
 
   function position(trigger: HTMLElement): void {
@@ -75,7 +67,6 @@ export function createTooltipHost(): TooltipHost {
     const text = trigger.getAttribute("aria-label");
     if (destroyed || text === null || !trigger.isConnected) return;
     clearOpenTimer();
-    clearCloseTimer();
     openTrigger?.removeAttribute("aria-describedby");
     openTrigger = trigger;
     label.textContent = text;
@@ -87,7 +78,6 @@ export function createTooltipHost(): TooltipHost {
 
   function close(): void {
     clearOpenTimer();
-    clearCloseTimer();
     if (openTrigger === null) return;
     openTrigger.removeAttribute("aria-describedby");
     openTrigger = null;
@@ -97,20 +87,13 @@ export function createTooltipHost(): TooltipHost {
 
   function requestOpen(trigger: HTMLElement): void {
     clearOpenTimer();
-    // Ark UI skips the delay while another tooltip is still on screen.
-    const immediate = openTrigger !== null || closeTimer !== null;
-    if (immediate) {
-      open(trigger);
-      return;
-    }
     openTimer = globalThis.setTimeout(() => open(trigger), OPEN_DELAY);
   }
 
   function requestClose(trigger: HTMLElement): void {
     clearOpenTimer();
     if (openTrigger !== trigger) return;
-    clearCloseTimer();
-    closeTimer = globalThis.setTimeout(close, CLOSE_DELAY);
+    close();
   }
 
   function handleKeydown(event: KeyboardEvent): void {

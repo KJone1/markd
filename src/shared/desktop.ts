@@ -1,11 +1,3 @@
-export interface AppInfo {
-  readonly [key: string]: unknown;
-  name: "Markd";
-  platform: string;
-  arch: string;
-  runtime: string;
-}
-
 export interface WorkspaceState {
   readonly [key: string]: unknown;
   activePath: string | null;
@@ -71,7 +63,6 @@ export type DocumentSaveResult =
   };
 
 export interface DesktopBindings {
-  getAppInfo(): Promise<AppInfo>;
   getWorkspaceState(): Promise<WorkspaceState>;
   getWorkspaceNavigation(): Promise<WorkspaceNavigation>;
   openWorkspaceFile(path: string): Promise<ActiveFile>;

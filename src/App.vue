@@ -14,7 +14,6 @@ import HtmlPreview from "./components/HtmlPreview.vue";
 import { DocumentSession } from "./document_session.ts";
 import type {
   ActiveFile,
-  AppInfo,
   WorkspaceNavigation,
   WorkspaceState,
 } from "./shared/desktop.ts";
@@ -31,7 +30,6 @@ const MarkdownEditor = defineAsyncComponent(
 );
 
 const primaryAction = ref<HTMLButtonElement>();
-const appInfo = ref<AppInfo>();
 const workspace = ref<WorkspaceState>({
   activePath: null,
   recentWorkspaces: [],
@@ -53,7 +51,6 @@ const workspaceName = computed(() => {
 });
 
 watchEffect(() => {
-  if (appInfo.value === undefined) return;
   document.title = workspaceWindowTitle(
     workspace.value.activePath,
     navigation.value.activeFile?.path ?? null,
@@ -246,19 +243,9 @@ onMounted(async () => {
   primaryAction.value?.focus();
 
   try {
-    [appInfo.value, workspace.value] = await Promise.all([
-      bindings.getAppInfo(),
-      bindings.getWorkspaceState(),
-    ]);
+    workspace.value = await bindings.getWorkspaceState();
     if (workspace.value.activePath !== null) await loadNavigation();
-  } catch {
-    appInfo.value = {
-      name: "Markd",
-      platform: "browser",
-      arch: "development",
-      runtime: "Web preview",
-    };
-  }
+  } catch { /* Web preview has no desktop bindings. */ }
 
   window.addEventListener("markd-workspace-change", handleWorkspaceChange);
   window.addEventListener("markd-files-change", handleFilesChange);
@@ -306,15 +293,6 @@ onBeforeUnmount(() => {
         </p>
       </section>
 
-      <aside class="status-card" aria-labelledby="status-title">
-        <span class="status-icon" aria-hidden="true">✓</span>
-        <div>
-          <h2 id="status-title">{{ workspaceName ?? "Ready to open" }}</h2>
-          <p role="status" aria-live="polite">
-            {{ appInfo ? `${appInfo.runtime} · ${appInfo.arch}` : "Connecting to desktop…" }}
-          </p>
-        </div>
-      </aside>
     </main>
 
     <main
@@ -426,13 +404,9 @@ onBeforeUnmount(() => {
 }
 
 .main {
-  width: min(100% - 64px, 1280px);
+  width: min(100% - 64px, 840px);
   margin: auto;
   padding: 96px 0;
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
-  gap: var(--space-lg);
-  align-items: end;
 }
 
 .welcome-card {
@@ -495,42 +469,6 @@ onBeforeUnmount(() => {
   margin: var(--space-md) 0 0;
   color: var(--color-muted);
   font-size: 13px;
-}
-
-.status-card {
-  display: flex;
-  gap: var(--space-md);
-  padding: var(--space-lg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 4px 12px rgb(15 23 42 / 5%);
-}
-
-.status-icon {
-  display: grid;
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  color: #047857;
-  background: #d1fae5;
-  border-radius: 9999px;
-  font-weight: 700;
-}
-
-.status-card h2 {
-  margin: 2px 0 4px;
-  color: var(--color-ink);
-  font-size: 18px;
-  line-height: 1.4;
-}
-
-.status-card p {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 14px;
-  line-height: 1.5;
 }
 
 .document-view {
@@ -638,7 +576,6 @@ onBeforeUnmount(() => {
   .main {
     width: calc(100% - 32px);
     padding: var(--space-xxl) 0;
-    grid-template-columns: 1fr;
   }
 
   .document-view {

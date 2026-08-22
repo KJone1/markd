@@ -1,6 +1,5 @@
 import type {
   ActiveFile,
-  AppInfo,
   DocumentSaveRequest,
   DocumentSaveResult,
   HtmlPreviewDocument,
@@ -8,17 +7,7 @@ import type {
   WorkspaceState,
 } from "../src/shared/desktop.ts";
 
-export interface RuntimeInfo {
-  platform: string;
-  arch: string;
-  version: string;
-}
-
 export interface BindingRegistrar {
-  bind(
-    name: "getAppInfo",
-    handler: () => Promise<AppInfo>,
-  ): void;
   bind(
     name: "getWorkspaceState",
     handler: () => Promise<WorkspaceState>,
@@ -77,16 +66,8 @@ export interface WorkspaceBindings {
 
 export function registerDesktopBindings(
   registrar: BindingRegistrar,
-  runtime: RuntimeInfo,
   workspace: WorkspaceBindings,
 ): void {
-  registrar.bind("getAppInfo", () =>
-    Promise.resolve({
-      name: "Markd",
-      platform: runtime.platform,
-      arch: runtime.arch,
-      runtime: `Deno ${runtime.version}`,
-    }));
   registrar.bind("getWorkspaceState", () => workspace.getState());
   registrar.bind("getWorkspaceNavigation", () => workspace.getNavigation());
   registrar.bind("openWorkspaceFile", (path) => workspace.openFile(path));

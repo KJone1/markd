@@ -88,11 +88,7 @@ if (desktopRuntime.BrowserWindow) {
       void removeRunningApp(runningAppPath).finally(() => Deno.exit(0));
     });
 
-    registerDesktopBindings(window, {
-      platform: Deno.build.os,
-      arch: Deno.build.arch,
-      version: Deno.version.deno,
-    }, workspace);
+    registerDesktopBindings(window, workspace);
     window.navigate(appOrigin);
     await workspace.initialize(requestedPath, { restoreLastWorkspace });
   };

@@ -86,12 +86,6 @@ describe("Markd shell", () => {
       "http://127.0.0.1:49152/notes/images/pixel.png",
     );
     const baseBindings = {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -143,12 +137,6 @@ describe("Markd shell", () => {
 
   it("routes only eligible Markdown documents to the Crepe editor", async () => {
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -185,12 +173,6 @@ describe("Markd shell", () => {
 
   it("renders no header, footer, or document chrome around an active document", async () => {
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -219,12 +201,6 @@ describe("Markd shell", () => {
 
   it("keeps the document card with filename, path, and reason for a binary file", async () => {
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -256,12 +232,6 @@ describe("Markd shell", () => {
     vi.useFakeTimers();
     const saveWorkspaceDocument = vi.fn().mockResolvedValue({ kind: "saved" });
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -303,12 +273,6 @@ describe("Markd shell", () => {
 
   it("uses the shared external-change conflict lifecycle for Markdown", async () => {
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -353,12 +317,6 @@ describe("Markd shell", () => {
 
   it("keeps one Markdown editor mounted while active files change", async () => {
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -449,12 +407,6 @@ describe("Markd shell", () => {
         },
       });
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/First",
         recentWorkspaces: ["/Users/example/First"],
@@ -497,12 +449,6 @@ describe("Markd shell", () => {
       .mockRejectedValueOnce(new Error("disk full"))
       .mockResolvedValue({ kind: "saved" });
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -539,12 +485,6 @@ describe("Markd shell", () => {
 
   it("shows eligible HTML as the only full active view", async () => {
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Site",
         recentWorkspaces: ["/Users/example/Site"],
@@ -585,12 +525,6 @@ describe("Markd shell", () => {
       content: "<!doctype html><title>Initial</title>",
     };
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Site",
         recentWorkspaces: ["/Users/example/Site"],
@@ -641,12 +575,6 @@ describe("Markd shell", () => {
       opened: true,
     });
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: null,
         recentWorkspaces: [],
@@ -665,24 +593,22 @@ describe("Markd shell", () => {
     expect(screen.queryByRole("banner")).toBeNull();
     expect(screen.queryByRole("contentinfo")).toBeNull();
     expect(screen.getByRole("main", { name: "Welcome to Markd" })).toBeTruthy();
-    expect(screen.getByRole("status")).toBeTruthy();
+    expect(screen.queryByRole("status")).toBeNull();
 
     const action = screen.getByRole("button", { name: "Open a workspace" });
     await waitFor(() => expect(document.activeElement).toBe(action));
     await fireEvent.click(action);
-    await waitFor(() => expect(screen.getByText("Notes")).toBeTruthy());
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Notes is ready." }),
+      ).toBeTruthy()
+    );
     expect(openFolder).toHaveBeenCalledOnce();
   });
 
   it("has no detectable accessibility violations", async () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: null,
         recentWorkspaces: [],
@@ -703,12 +629,6 @@ describe("Markd shell", () => {
       .mockRejectedValueOnce(new Error("disk full"))
       .mockResolvedValue({ kind: "saved" });
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -749,12 +669,6 @@ describe("Markd shell", () => {
       new Error("file unavailable"),
     );
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -795,12 +709,6 @@ describe("Markd shell", () => {
 
   it("keeps a conflicting external change behind an explicit reload decision", async () => {
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],
@@ -860,12 +768,6 @@ describe("Markd shell", () => {
     vi.useFakeTimers();
     const saveWorkspaceDocument = vi.fn().mockResolvedValue({ kind: "saved" });
     vi.stubGlobal("bindings", {
-      getAppInfo: vi.fn().mockResolvedValue({
-        name: "Markd",
-        platform: "darwin",
-        arch: "aarch64",
-        runtime: "Deno 2.9.0",
-      }),
       getWorkspaceState: vi.fn().mockResolvedValue({
         activePath: "/Users/example/Notes",
         recentWorkspaces: ["/Users/example/Notes"],

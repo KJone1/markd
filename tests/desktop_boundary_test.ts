@@ -3,7 +3,7 @@ import {
   registerDesktopBindings,
 } from "../desktop/bindings.ts";
 
-Deno.test("registerDesktopBindings exposes only typed app and workspace calls", async () => {
+Deno.test("registerDesktopBindings exposes only typed workspace calls", async () => {
   const registered = new Map<string, (...args: never[]) => unknown>();
   const registrar: BindingRegistrar = {
     bind(name, handler) {
@@ -12,10 +12,6 @@ Deno.test("registerDesktopBindings exposes only typed app and workspace calls", 
   };
 
   registerDesktopBindings(registrar, {
-    platform: "darwin",
-    arch: "aarch64",
-    version: "2.9.0",
-  }, {
     getState: () =>
       Promise.resolve({
         activePath: "/workspace",
@@ -51,7 +47,6 @@ Deno.test("registerDesktopBindings exposes only typed app and workspace calls", 
 
   const names = [...registered.keys()];
   const expectedNames = [
-    "getAppInfo",
     "getWorkspaceState",
     "getWorkspaceNavigation",
     "openWorkspaceFile",
@@ -64,19 +59,6 @@ Deno.test("registerDesktopBindings exposes only typed app and workspace calls", 
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
     throw new Error(`Unexpected privileged boundary: ${names.join(", ")}`);
-  }
-
-  const getAppInfo = registered.get("getAppInfo");
-  const result = await getAppInfo?.();
-  const expected = {
-    name: "Markd",
-    platform: "darwin",
-    arch: "aarch64",
-    runtime: "Deno 2.9.0",
-  };
-
-  if (JSON.stringify(result) !== JSON.stringify(expected)) {
-    throw new Error(`Unexpected app info: ${JSON.stringify(result)}`);
   }
 
   const workspace = await registered.get("getWorkspaceState")?.();

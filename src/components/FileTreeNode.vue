@@ -7,11 +7,6 @@ defineProps<{
   indexPath: number[];
   onFileOpen: (path: string) => void;
 }>();
-
-function focusRow(event: PointerEvent): void {
-  const row = event.currentTarget;
-  if (row instanceof HTMLElement) row.focus();
-}
 </script>
 
 <template>
@@ -21,10 +16,7 @@ function focusRow(event: PointerEvent): void {
         v-if="node.kind === 'directory'"
         class="file-tree-branch"
       >
-        <TreeView.BranchControl
-          class="file-tree-branch-control"
-          @pointerenter="focusRow"
-        >
+        <TreeView.BranchControl class="file-tree-branch-control">
           <TreeView.BranchIndicator class="file-tree-branch-indicator">
             <svg
               viewBox="0 0 24 24"
@@ -84,7 +76,6 @@ function focusRow(event: PointerEvent): void {
       <TreeView.Item
         v-else
         class="file-tree-item"
-        @pointerenter="focusRow"
         @click="onFileOpen(node.path)"
         @keydown.enter="onFileOpen(node.path)"
       >
@@ -147,6 +138,7 @@ function focusRow(event: PointerEvent): void {
   cursor: pointer;
 }
 
+.file-tree-branch-control:hover,
 .file-tree-branch-control[data-focus] {
   background: var(--color-hairline-soft);
 }
@@ -248,6 +240,7 @@ function focusRow(event: PointerEvent): void {
   cursor: pointer;
 }
 
+.file-tree-item:hover,
 .file-tree-item[data-focus] {
   background: var(--color-hairline-soft);
 }
