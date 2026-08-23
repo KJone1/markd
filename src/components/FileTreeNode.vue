@@ -7,6 +7,12 @@ defineProps<{
   indexPath: number[];
   onFileOpen: (path: string) => void;
 }>();
+
+/* The pointer drives the same cursor as the arrow keys, so only one row is
+   ever marked. */
+function focusRow(event: MouseEvent): void {
+  (event.currentTarget as HTMLElement).focus({ preventScroll: true });
+}
 </script>
 
 <template>
@@ -16,7 +22,10 @@ defineProps<{
         v-if="node.kind === 'directory'"
         class="file-tree-branch"
       >
-        <TreeView.BranchControl class="file-tree-branch-control">
+        <TreeView.BranchControl
+          class="file-tree-branch-control"
+          @mouseenter="focusRow"
+        >
           <TreeView.BranchIndicator class="file-tree-branch-indicator">
             <svg
               viewBox="0 0 24 24"
@@ -76,6 +85,7 @@ defineProps<{
       <TreeView.Item
         v-else
         class="file-tree-item"
+        @mouseenter="focusRow"
         @click="onFileOpen(node.path)"
         @keydown.enter="onFileOpen(node.path)"
       >
@@ -138,14 +148,12 @@ defineProps<{
   cursor: pointer;
 }
 
-.file-tree-branch-control:hover,
 .file-tree-branch-control[data-focus] {
   background: var(--color-hairline-soft);
 }
 
 .file-tree-branch-control:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+  outline: none;
 }
 
 .file-tree-branch-control[data-selected] {
@@ -240,14 +248,12 @@ defineProps<{
   cursor: pointer;
 }
 
-.file-tree-item:hover,
 .file-tree-item[data-focus] {
   background: var(--color-hairline-soft);
 }
 
 .file-tree-item:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+  outline: none;
 }
 
 .file-tree-item[data-selected] {
