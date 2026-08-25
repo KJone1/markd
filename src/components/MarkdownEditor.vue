@@ -411,11 +411,13 @@ onBeforeUnmount(destroyEditor);
   overflow: hidden auto;
   color: var(--color-body);
   background: var(--color-canvas);
-  scroll-behavior: smooth;
+  overscroll-behavior: contain;
 }
 
 /* Everything below is rendered by Milkdown plugins and src/editor/*.ts, never in this template. */
 .markdown-editor :deep(.milkdown) {
+  display: flex;
+  flex-direction: column;
   min-height: 100%;
   --crepe-base-font-size: 16px;
   --crepe-color-background: var(--color-surface);
@@ -443,6 +445,7 @@ onBeforeUnmount(destroyEditor);
 }
 
 .markdown-editor :deep(.milkdown .milkdown-top-bar) {
+  flex: none;
   padding: 0 var(--space-md);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-hairline);
@@ -460,7 +463,7 @@ onBeforeUnmount(destroyEditor);
 
 .markdown-editor :deep(.milkdown .ProseMirror) {
   width: 100%;
-  min-height: 100%;
+  flex: 1 0 auto;
   padding: var(--space-xxl);
   color: var(--color-body);
   caret-color: var(--color-primary-active);

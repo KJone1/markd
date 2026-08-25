@@ -33,7 +33,7 @@ function reveal(view: EditorView, typeName: string, label: string): void {
   if (position === null) return;
   const dom = view.nodeDOM(position);
   if (!(dom instanceof HTMLElement)) return;
-  dom.scrollIntoView({ block: "center" });
+  dom.scrollIntoView({ block: "center", behavior: "smooth" });
   dom.dataset.footnoteFlash = "true";
   globalThis.setTimeout(() => {
     delete dom.dataset.footnoteFlash;
