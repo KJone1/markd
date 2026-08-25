@@ -25,6 +25,7 @@ import { footnotesFeature } from "../editor/footnotes.ts";
 import { listIndentFeature } from "../editor/list-indent.ts";
 import {
   copyPathIcon,
+  fileTreeIcon,
   indentIcon,
   outdentIcon,
   zedIcon,
@@ -47,6 +48,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   change: [content: string];
+  browseFiles: [];
   copyPath: [];
   openInZed: [];
 }>();
@@ -202,8 +204,9 @@ function labelEditorControls(): void {
     [".milkdown-top-bar .top-bar-item:nth-of-type(13)", "Code block", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(14)", "Quote", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(15)", "Divider", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(16)", "Copy file path", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(17)", "Open in Zed", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(16)", "Browse files", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(17)", "Copy file path", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(18)", "Open in Zed", "pointerdown"],
   ] as const;
   for (const [selector, label, activationEvent] of controlLabels) {
     host.value?.querySelectorAll<HTMLElement>(selector).forEach((control) => {
@@ -310,6 +313,11 @@ onMounted(async () => {
             (item) => item.key !== "math",
           );
           const documentGroup = builder.addGroup("document", "Document");
+          documentGroup.addItem("browse-files", {
+            icon: fileTreeIcon,
+            active: () => false,
+            onRun: () => emit("browseFiles"),
+          });
           documentGroup.addItem("copy-path", {
             icon: copyPathIcon,
             active: () => false,
@@ -442,6 +450,12 @@ onBeforeUnmount(destroyEditor);
 
 .markdown-editor :deep(.milkdown .milkdown-top-bar .top-bar-divider) {
   background: var(--color-hairline);
+}
+
+/* Crepe fills every top-bar svg, which turns stroke icons into blobs. */
+.markdown-editor :deep(.milkdown .milkdown-top-bar .top-bar-item svg.outline-icon) {
+  fill: none;
+  stroke: currentColor;
 }
 
 .markdown-editor :deep(.milkdown .ProseMirror) {

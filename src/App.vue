@@ -325,6 +325,7 @@ onBeforeUnmount(() => {
         :content="editorContent"
         :resolve-image="resolveMarkdownImage"
         @change="editDocument"
+        @browse-files="treeOpen = true"
         @copy-path="copyActivePath"
         @open-in-zed="openActiveFileInZed"
       />
