@@ -44,10 +44,14 @@ vi.mock("@milkdown/crepe", () => {
     static Feature = {
       AI: "ai",
       BlockEdit: "block-edit",
+      CodeMirror: "code-mirror",
       Cursor: "cursor",
       ImageBlock: "image-block",
+      Latex: "latex",
       LinkTooltip: "link-tooltip",
+      ListItem: "list-item",
       Placeholder: "placeholder",
+      Table: "table",
       Toolbar: "toolbar",
       TopBar: "top-bar",
     };
@@ -185,9 +189,75 @@ describe("MarkdownEditor", () => {
     };
     const topBarConfig = instance.config.featureConfigs?.["top-bar"];
     expect(topBarConfig?.codeBlockIcon).toContain(
-      'class="outline-icon lucide lucide-square-terminal-icon lucide-square-terminal"',
+      'class="lucide-icon"',
     );
     expect(topBarConfig?.codeBlockIcon).toContain('d="m7 11 2-2-2-2"');
+    for (
+      const [feature, fields] of Object.entries({
+        "code-mirror": [
+          "expandIcon",
+          "searchIcon",
+          "clearSearchIcon",
+          "copyIcon",
+        ],
+        "image-block": [
+          "inlineImageIcon",
+          "inlineConfirmButton",
+          "blockImageIcon",
+          "blockCaptionIcon",
+        ],
+        latex: ["inlineEditConfirm"],
+        "link-tooltip": [
+          "linkIcon",
+          "editButton",
+          "removeButton",
+          "confirmButton",
+        ],
+        "list-item": [
+          "bulletIcon",
+          "checkBoxCheckedIcon",
+          "checkBoxUncheckedIcon",
+        ],
+        table: [
+          "addRowIcon",
+          "addColIcon",
+          "deleteRowIcon",
+          "deleteColIcon",
+          "alignLeftIcon",
+          "alignCenterIcon",
+          "alignRightIcon",
+          "colDragHandleIcon",
+          "rowDragHandleIcon",
+        ],
+        "top-bar": [
+          "boldIcon",
+          "italicIcon",
+          "strikethroughIcon",
+          "codeIcon",
+          "linkIcon",
+          "imageIcon",
+          "tableIcon",
+          "codeBlockIcon",
+          "mathIcon",
+          "quoteIcon",
+          "hrIcon",
+          "bulletListIcon",
+          "orderedListIcon",
+          "taskListIcon",
+          "chevronDownIcon",
+        ],
+      })
+    ) {
+      for (const field of fields) {
+        expect(instance.config.featureConfigs?.[feature]?.[field]).toContain(
+          'class="lucide-icon"',
+        );
+      }
+    }
+    const previewToggleIcon = instance.config.featureConfigs?.["code-mirror"]
+      ?.previewToggleIcon as (previewOnlyMode: boolean) => string;
+    expect(previewToggleIcon(true)).toContain('class="lucide-icon"');
+    expect(previewToggleIcon(false)).toContain('class="lucide-icon"');
     const buildTopBar = topBarConfig?.buildTopBar as (builder: {
       getGroup: (key: string) => GroupInstance;
       addGroup: (key: string, label: string) => GroupInstance;
@@ -240,7 +310,7 @@ describe("MarkdownEditor", () => {
     ]);
     expect(added["block"]!.map(({ key }) => key)).toEqual(["details"]);
     expect(added["block"]![0]!.item.icon).toContain(
-      'class="outline-icon lucide lucide-list-collapse-icon lucide-list-collapse"',
+      'class="lucide-icon"',
     );
     expect(added["block"]![0]!.item.icon).toContain('d="M10 5h11"');
     expect(added["block"]![0]!.item.active()).toBe(false);

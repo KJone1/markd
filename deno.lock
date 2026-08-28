@@ -10,6 +10,7 @@
     "npm:fuzzysort@^3.1.0": "3.1.0",
     "npm:jsdom@*": "30.0.1",
     "npm:jsdom@30.0.1": "30.0.1",
+    "npm:lucide@1.34.0": "1.34.0",
     "npm:monaco-editor@~0.55.1": "0.55.1",
     "npm:npm@11.19.0": "11.19.0",
     "npm:typescript@6.0.3": "6.0.3",
@@ -2716,6 +2717,9 @@
     "lru-cache@11.5.2": {
       "integrity": "sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g=="
     },
+    "lucide@1.34.0": {
+      "integrity": "sha512-OOPdNzu3Ocs9lLPOu1sWVIp4sue3HXYjZThAmSXu/NhBJ9ZnfLQhCGfbQRYvsVJvSKwi/KtLE5pNbS4fYl5zrA=="
+    },
     "lz-string@1.5.0": {
       "integrity": "sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==",
       "bin": true
@@ -3926,6 +3930,7 @@
         "npm:axe-core@4.13.0",
         "npm:fuzzysort@^3.1.0",
         "npm:jsdom@30.0.1",
+        "npm:lucide@1.34.0",
         "npm:monaco-editor@~0.55.1",
         "npm:typescript@6.0.3",
         "npm:vite@8.2.1",

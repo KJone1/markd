@@ -29,12 +29,18 @@ import { listIndentFeature } from "../editor/list-indent.ts";
 import {
   chevronDownMask,
   chevronRightMask,
+  codeMirrorIcons,
   copyPathIcon,
   detailsIcon,
   fileTreeIcon,
+  imageBlockIcons,
   indentIcon,
+  latexIcons,
+  linkTooltipIcons,
+  listItemIcons,
   outdentIcon,
-  terminalIcon,
+  tableIcons,
+  topBarIcons,
   zedIcon,
 } from "../editor/icons.ts";
 import { createTooltipHost, type TooltipHost } from "../editor/tooltips.ts";
@@ -304,15 +310,21 @@ onMounted(async () => {
       [Crepe.Feature.Cursor]: {
         virtual: false,
       },
+      [Crepe.Feature.CodeMirror]: codeMirrorIcons,
       [Crepe.Feature.ImageBlock]: {
+        ...imageBlockIcons,
         proxyDomURL: (url: string) => props.resolveImage?.(url) ?? url,
         inlineOnUpload: () =>
           Promise.reject(new Error("File upload is unavailable")),
         blockOnUpload: () =>
           Promise.reject(new Error("File upload is unavailable")),
       },
+      [Crepe.Feature.Latex]: latexIcons,
+      [Crepe.Feature.LinkTooltip]: linkTooltipIcons,
+      [Crepe.Feature.ListItem]: listItemIcons,
+      [Crepe.Feature.Table]: tableIcons,
       [Crepe.Feature.TopBar]: {
-        codeBlockIcon: terminalIcon,
+        ...topBarIcons,
         buildTopBar: (builder) => {
           const list = builder.getGroup("list");
           list.addItem("indent", {
@@ -479,9 +491,9 @@ onBeforeUnmount(destroyEditor);
   background: var(--color-hairline);
 }
 
-/* Crepe fills every top-bar svg, which turns stroke icons into blobs. */
-.markdown-editor :deep(.milkdown .milkdown-top-bar .top-bar-item svg.outline-icon) {
-  fill: none;
+/* Crepe fills its SVG icons by default, which turns Lucide strokes into blobs. */
+.markdown-editor :deep(.milkdown svg.lucide-icon) {
+  fill: none !important;
   stroke: currentColor;
 }
 
