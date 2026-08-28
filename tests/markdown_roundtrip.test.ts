@@ -48,6 +48,16 @@ afterEach(() => {
 });
 
 describe("Markdown round trips", () => {
+  it("does not show the generic empty-block placeholder", async () => {
+    const view = render(MarkdownEditor, {
+      props: { path: "notes/empty.md", content: "" },
+    });
+    await screen.findByRole("textbox", { name: "Editing notes/empty.md" });
+
+    expect(view.container.querySelector(".crepe-placeholder")).toBeNull();
+    expect(view.container.textContent).not.toContain("Please enter...");
+  });
+
   it("names the visual editing surface and has no detectable accessibility violations", async () => {
     const view = render(MarkdownEditor, {
       props: { path: "notes/accessible.md", content: "# Accessible" },
@@ -300,7 +310,12 @@ describe("Top bar", () => {
     const view = render(MarkdownEditor, {
       props: { path: "notes/topbar.md", content: "Plain paragraph" },
     });
-    await screen.findByRole("textbox", { name: "Editing notes/topbar.md" });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing notes/topbar.md",
+    });
+
+    expect(editor.classList.contains("virtual-cursor-enabled")).toBe(false);
+    expect(editor.querySelector(".prosemirror-virtual-cursor")).toBeNull();
 
     expect(view.container.querySelector(".milkdown-top-bar")).toBeTruthy();
     expect(await screen.findByRole("button", { name: "Paragraph" }))
@@ -320,16 +335,19 @@ describe("Top bar", () => {
         "Insert image",
         "Insert table",
         "Code block",
+        "Insert collapsible section",
         "Quote",
         "Divider",
+        "Browse files",
         "Copy file path",
+        "Open in Zed",
       ]
     ) {
       expect(await screen.findByRole("button", { name })).toBeTruthy();
     }
     expect(
       view.container.querySelectorAll(".milkdown-top-bar .top-bar-item"),
-    ).toHaveLength(17);
+    ).toHaveLength(19);
 
     const paragraph = view.container.querySelector(".ProseMirror p")!;
     await fireEvent.mouseOver(paragraph);
@@ -338,6 +356,44 @@ describe("Top bar", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     const results = await axe.run(view.container);
     expect(results.violations).toEqual([]);
+  });
+
+  it("wraps the current block in a collapsible section from the top bar", async () => {
+    const view = render(MarkdownEditor, {
+      props: { path: "notes/details.md", content: "Selected body" },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing notes/details.md",
+    });
+    await fireEvent.pointerDown(
+      await screen.findByRole("button", {
+        name: "Insert collapsible section",
+      }),
+    );
+
+    const details = await waitFor(() => {
+      const element = editor.querySelector<HTMLDetailsElement>("details");
+      expect(element).toBeTruthy();
+      return element!;
+    });
+    const summary = details.querySelector<HTMLElement>(
+      ":scope > summary.details-summary",
+    )!;
+    expect(summary.textContent).toBe("Summary");
+    expect(details.querySelector("p")?.textContent).toBe("Selected body");
+    expect(details.open).toBe(false);
+
+    await waitFor(() => {
+      const markdown = view.emitted<string[]>("change").at(-1)?.[0] ?? "";
+      expect(markdown).toContain("<details>");
+      expect(markdown).toContain("<summary>Summary</summary>");
+      expect(markdown).toContain("Selected body");
+      expect(markdown).toContain("</details>");
+    });
+
+    await fireEvent.keyDown(summary, { key: "Enter" });
+    expect(details.querySelectorAll(":scope > summary")).toHaveLength(1);
+    expect(details.querySelector("p")?.textContent).toBe("Selected body");
   });
 
   it("applies a heading level from the top bar without requiring a text selection", async () => {

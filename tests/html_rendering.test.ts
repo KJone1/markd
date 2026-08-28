@@ -120,6 +120,88 @@ describe("html rendering", () => {
     });
   });
 
+  it("renders a native collapsible details section with a direct editable summary", async () => {
+    const source = [
+      "<details>",
+      '<summary title="Reveal section">Section title</summary>',
+      "",
+      "Hidden **detail**",
+      "",
+      "</details>",
+      "",
+    ].join("\n");
+    const view = render(MarkdownEditor, {
+      props: { path: "docs/details.md", content: source },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing docs/details.md",
+    });
+    const details = await waitFor(() => {
+      const element = editor.querySelector<HTMLDetailsElement>("details");
+      expect(element).toBeTruthy();
+      return element!;
+    });
+    const summary = details.querySelector<HTMLElement>(
+      ":scope > summary.details-summary",
+    )!;
+
+    expect(summary.parentElement).toBe(details);
+    expect(summary.textContent).toBe("Section title");
+    expect(summary.getAttribute("title")).toBe("Reveal section");
+    expect(details.open).toBe(false);
+    expect(details.querySelector("strong")?.textContent).toBe("detail");
+
+    await fireEvent.click(summary);
+    expect(details.open).toBe(true);
+
+    summary.textContent = "Renamed section";
+    await fireEvent.input(editor);
+    await waitFor(() => {
+      const saved = view.emitted<string[]>("change").at(-1)?.[0] ?? "";
+      expect(saved).toContain(
+        '<summary title="Reveal section">Renamed section</summary>',
+      );
+      expect(saved).toContain("Hidden **detail**");
+      expect(saved).toContain("<details>");
+      expect(saved).not.toContain("<details open>");
+    });
+  });
+
+  it("uses the source open attribute only as the initial details state", async () => {
+    const source = [
+      "<details open>",
+      "<summary>Initially open</summary>",
+      "",
+      "Body",
+      "",
+      "</details>",
+      "",
+    ].join("\n");
+    const view = render(MarkdownEditor, {
+      props: { path: "docs/open-details.md", content: source },
+    });
+    const editor = await screen.findByRole("textbox", {
+      name: "Editing docs/open-details.md",
+    });
+    const details = await waitFor(() => {
+      const element = editor.querySelector<HTMLDetailsElement>("details");
+      expect(element).toBeTruthy();
+      return element!;
+    });
+    expect(details.open).toBe(true);
+
+    await fireEvent.click(details.querySelector("summary")!);
+    expect(details.open).toBe(false);
+
+    details.querySelector("p")!.textContent = "Edited body";
+    await fireEvent.input(editor);
+    await waitFor(() => {
+      const saved = view.emitted<string[]>("change").at(-1)?.[0] ?? "";
+      expect(saved).toContain("<details open>");
+      expect(saved).toContain("Edited body");
+    });
+  });
+
   it("shows unsafe html as inert source instead of rendering it", async () => {
     const source = [
       '<img src="javascript:alert(1)" alt="x">',

@@ -17,14 +17,16 @@ import {
 } from "@milkdown/kit/preset/commonmark";
 import { $nodeSchema, $prose, $remark, $view } from "@milkdown/kit/utils";
 import {
+  detailsSummarySchema,
   htmlBlockSchema,
   htmlSectionSchema,
   isRenderableHtmlTag,
+  parseDetailsSummary,
 } from "./html.ts";
 
 const NAME_SOURCE = "[A-Za-z_][A-Za-z0-9_.:-]*";
 const ATTRIBUTE_SOURCE =
-  `(?:\\s+${NAME_SOURCE}\\s*=\\s*(?:\"[^\"<]*\"|'[^'<]*'))*\\s*`;
+  `(?:\\s+${NAME_SOURCE}(?:\\s*=\\s*(?:\"[^\"<]*\"|'[^'<]*'))?)*\\s*`;
 const OPENING = new RegExp(
   `^(\\s*)<(${NAME_SOURCE})([^<>]*)>(\\s*)$`,
 );
@@ -52,6 +54,8 @@ interface MarkdownNode {
   name?: string;
   openRaw?: string;
   closeRaw?: string;
+  sourceRaw?: string;
+  sourceText?: string;
   position?: {
     start: { line: number };
     end: { line: number };
@@ -468,16 +472,59 @@ function groupPromptSections(children: MarkdownNode[]): MarkdownNode[] {
       continue;
     }
 
+    const sectionChildren = groupPromptSections(
+      children.slice(index + 1, closingIndex),
+    );
+    if (opening.html && opening.name.toLowerCase() === "details") {
+      const summary = markdownDetailsSummary(sectionChildren[0]);
+      if (summary !== null) sectionChildren[0] = summary;
+    }
     result.push({
       type: opening.html ? "htmlSection" : "promptSection",
       name: opening.name,
       openRaw: opening.raw,
       closeRaw: closing.raw,
-      children: groupPromptSections(children.slice(index + 1, closingIndex)),
+      children: sectionChildren,
     });
     index = closingIndex;
   }
   return result;
+}
+
+function markdownHtmlValue(node: MarkdownNode | undefined): string | null {
+  if (node === undefined) return null;
+  if (
+    (node.type === "html" || node.type === "htmlBlock") &&
+    typeof node.value === "string"
+  ) return node.value;
+  if (node.type !== "paragraph" || node.children === undefined) return null;
+  const values = node.children.map((child) =>
+    child.type === "html" && typeof child.value === "string"
+      ? child.value
+      : null
+  );
+  return values.length > 0 && values.every((value) => value !== null)
+    ? values.join("")
+    : null;
+}
+
+function markdownDetailsSummary(
+  node: MarkdownNode | undefined,
+): MarkdownNode | null {
+  const source = markdownHtmlValue(node);
+  if (source === null) return null;
+  const summary = parseDetailsSummary(source);
+  if (summary === null) return null;
+  return {
+    type: "detailsSummary",
+    openRaw: summary.openRaw,
+    closeRaw: summary.closeRaw,
+    sourceRaw: summary.raw,
+    sourceText: summary.text,
+    children: summary.text === ""
+      ? []
+      : [{ type: "text", value: summary.text }],
+  };
 }
 
 const promptSectionRemark = $remark(
@@ -917,6 +964,32 @@ function rawBoundaryBlock(node: ProseNode): PromptBoundary | null {
   return parseBoundary(node.textContent);
 }
 
+function proseHtmlValue(node: ProseNode | undefined): string | null {
+  if (node === undefined) return null;
+  if (node.type.name === "html_block") return node.attrs.value as string;
+  if (
+    node.type.name === "paragraph" && node.childCount === 1 &&
+    node.firstChild?.type.name === "html"
+  ) return node.firstChild.attrs.value as string;
+  return node.type.name === "paragraph" ? node.textContent : null;
+}
+
+function proseDetailsSummary(
+  node: ProseNode | undefined,
+  view: EditorView,
+): ProseNode | null {
+  const source = proseHtmlValue(node);
+  const summary = source === null ? null : parseDetailsSummary(source);
+  const type = view.state.schema.nodes.details_summary;
+  if (summary === null || type === undefined) return null;
+  return type.create({
+    openRaw: summary.openRaw,
+    closeRaw: summary.closeRaw,
+    sourceRaw: summary.raw,
+    sourceText: summary.text,
+  }, summary.text === "" ? undefined : view.state.schema.text(summary.text));
+}
+
 function conversionTransaction(
   doc: ProseNode,
   view: EditorView,
@@ -969,9 +1042,17 @@ function conversionTransaction(
       const closeChild = children[pair.close]!;
       const start = contentStart + openChild.pos;
       const end = contentStart + closeChild.pos + closeChild.node.nodeSize;
-      const inner = Fragment.fromArray(
-        children.slice(pair.open + 1, pair.close).map((item) => item.node),
+      const innerNodes = children.slice(pair.open + 1, pair.close).map(
+        (item) => item.node,
       );
+      if (
+        pair.opening.html &&
+        pair.opening.name.toLowerCase() === "details"
+      ) {
+        const summary = proseDetailsSummary(innerNodes[0], view);
+        if (summary !== null) innerNodes[0] = summary;
+      }
+      const inner = Fragment.fromArray(innerNodes);
       transaction = transaction.replaceWith(
         start,
         end,
@@ -1084,6 +1165,7 @@ export function promptSectionsFeature(editor: Editor): void {
     promptSectionView,
     promptSectionEditing,
     htmlBlockSchema,
+    detailsSummarySchema,
     htmlSectionSchema,
   ].flat());
 }

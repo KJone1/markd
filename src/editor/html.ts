@@ -1,7 +1,16 @@
 import type { Editor } from "@milkdown/kit/core";
 import type { Node as ProseNode } from "@milkdown/kit/prose/model";
+import { type Command, TextSelection } from "@milkdown/kit/prose/state";
+import { findWrapping } from "@milkdown/kit/prose/transform";
 import type { EditorView, NodeView } from "@milkdown/kit/prose/view";
-import { $nodeSchema, $remark, $view } from "@milkdown/kit/utils";
+import { paragraphSchema } from "@milkdown/kit/preset/commonmark";
+import {
+  $command,
+  $nodeSchema,
+  $remark,
+  $shortcut,
+  $view,
+} from "@milkdown/kit/utils";
 
 interface MarkdownNode {
   type: string;
@@ -12,6 +21,13 @@ interface MarkdownNode {
 
 export interface HtmlFeatureConfig {
   resolveImage?: (path: string) => Promise<string> | null | undefined;
+}
+
+export interface DetailsSummarySource {
+  openRaw: string;
+  closeRaw: string;
+  raw: string;
+  text: string;
 }
 
 const RENDERABLE_TAGS = new Set([
@@ -156,6 +172,27 @@ export function renderableHtml(source: string): DocumentFragment | null {
   return content;
 }
 
+const DETAILS_SUMMARY =
+  /^(\s*<summary(?:\s[^<>]*)?>)([\s\S]*)(<\/summary\s*>\s*)$/i;
+
+export function parseDetailsSummary(
+  source: string,
+): DetailsSummarySource | null {
+  const match = DETAILS_SUMMARY.exec(source);
+  if (match === null) return null;
+  const fragment = renderableHtml(source);
+  const element = fragment?.firstElementChild;
+  if (
+    element?.localName !== "summary" || fragment?.children.length !== 1
+  ) return null;
+  return {
+    openRaw: match[1]!,
+    closeRaw: match[3]!,
+    raw: source,
+    text: element.textContent ?? "",
+  };
+}
+
 function deferRelativeImages(root: ParentNode): void {
   for (const image of root.querySelectorAll("img[src]")) {
     const source = image.getAttribute("src")!;
@@ -249,6 +286,85 @@ export const htmlBlockSchema = $nodeSchema("html_block", () => ({
   },
 }));
 
+function detailsSummaryAttributes(openRaw: string, closeRaw: string) {
+  const fragment = renderableHtml(`${openRaw}${closeRaw}`);
+  const summary = fragment?.firstElementChild;
+  const attributes: Record<string, string> = {};
+  if (summary?.localName === "summary") {
+    for (const attribute of summary.attributes) {
+      attributes[attribute.name] = attribute.value;
+    }
+  }
+  return attributes;
+}
+
+export const detailsSummarySchema = $nodeSchema("details_summary", () => ({
+  content: "inline*",
+  group: "block",
+  defining: true,
+  attrs: {
+    openRaw: { default: "<summary>", validate: "string" },
+    closeRaw: { default: "</summary>", validate: "string" },
+    sourceRaw: {
+      default: "<summary>Summary</summary>",
+      validate: "string",
+    },
+    sourceText: { default: "Summary", validate: "string" },
+  },
+  parseDOM: [{
+    tag: 'summary[data-type="details-summary"]',
+    getAttrs: (dom) => ({
+      openRaw: dom.dataset.summaryOpen ?? "<summary>",
+      closeRaw: dom.dataset.summaryClose ?? "</summary>",
+      sourceRaw: dom.dataset.summarySource ?? "<summary>Summary</summary>",
+      sourceText: dom.dataset.summaryText ?? dom.textContent ?? "Summary",
+    }),
+  }],
+  toDOM: (node) => [
+    "summary",
+    {
+      ...detailsSummaryAttributes(
+        node.attrs.openRaw as string,
+        node.attrs.closeRaw as string,
+      ),
+      class: "details-summary",
+      "data-type": "details-summary",
+      "data-summary-open": node.attrs.openRaw,
+      "data-summary-close": node.attrs.closeRaw,
+      "data-summary-source": node.attrs.sourceRaw,
+      "data-summary-text": node.attrs.sourceText,
+    },
+    0,
+  ],
+  parseMarkdown: {
+    match: (node) => node.type === "detailsSummary",
+    runner: (state, node, type) => {
+      state.openNode(type, {
+        openRaw: node.openRaw,
+        closeRaw: node.closeRaw,
+        sourceRaw: node.sourceRaw,
+        sourceText: node.sourceText,
+      }).next(node.children ?? []).closeNode();
+    },
+  },
+  toMarkdown: {
+    match: (node) => node.type.name === "details_summary",
+    runner: (state, node) => {
+      state.openNode("paragraph");
+      if (
+        node.textContent === node.attrs.sourceText && node.attrs.sourceRaw
+      ) {
+        state.addNode("html", undefined, node.attrs.sourceRaw as string);
+      } else {
+        state.addNode("html", undefined, node.attrs.openRaw as string);
+        state.next(node.content);
+        state.addNode("html", undefined, node.attrs.closeRaw as string);
+      }
+      state.closeNode();
+    },
+  },
+}));
+
 export const htmlSectionSchema = $nodeSchema("html_section", () => ({
   content: "block*",
   group: "block",
@@ -293,6 +409,96 @@ export const htmlSectionSchema = $nodeSchema("html_section", () => ({
       state.addNode("html", undefined, node.attrs.openRaw as string);
       state.next(node.content);
       state.addNode("html", undefined, node.attrs.closeRaw as string);
+    },
+  },
+}));
+
+export const insertDetailsCommand = $command(
+  "InsertDetails",
+  (ctx) => () => (state, dispatch) => {
+    const detailsType = htmlSectionSchema.type(ctx);
+    const summaryType = detailsSummarySchema.type(ctx);
+    const range = state.selection.$from.blockRange(state.selection.$to);
+    const attrs = {
+      name: "details",
+      openRaw: "<details>",
+      closeRaw: "</details>",
+    };
+    const wrapping = range && findWrapping(range, detailsType, attrs);
+    if (range === null || wrapping === null) return false;
+
+    const title = "Summary";
+    const summary = summaryType.create({
+      openRaw: "<summary>",
+      closeRaw: "</summary>",
+      sourceRaw: `<summary>${title}</summary>`,
+      sourceText: title,
+    }, state.schema.text(title));
+    let transaction = state.tr.wrap(range, wrapping);
+    const mappedHead = transaction.mapping.map(state.selection.head, 1);
+    const $head = transaction.doc.resolve(
+      Math.min(mappedHead, transaction.doc.content.size),
+    );
+    let detailsPosition: number | null = null;
+    for (let depth = $head.depth; depth > 0; depth -= 1) {
+      if ($head.node(depth).type !== detailsType) continue;
+      detailsPosition = $head.before(depth);
+      break;
+    }
+    if (detailsPosition === null) return false;
+
+    transaction = transaction.insert(detailsPosition + 1, summary);
+    const titleStart = detailsPosition + 2;
+    transaction = transaction.setSelection(
+      TextSelection.create(
+        transaction.doc,
+        titleStart,
+        titleStart + title.length,
+      ),
+    );
+    dispatch?.(transaction.scrollIntoView());
+    return true;
+  },
+);
+
+const detailsSummaryShortcut = $shortcut((ctx) => ({
+  Enter: {
+    key: "Enter",
+    priority: 100,
+    onRun: (): Command => (state, dispatch) => {
+      const summaryType = detailsSummarySchema.type(ctx);
+      const { $from } = state.selection;
+      let summaryDepth = -1;
+      for (let depth = $from.depth; depth > 0; depth -= 1) {
+        if ($from.node(depth).type !== summaryType) continue;
+        summaryDepth = depth;
+        break;
+      }
+      if (summaryDepth < 1) return false;
+      const section = $from.node(summaryDepth - 1);
+      if (
+        section.type !== htmlSectionSchema.type(ctx) ||
+        String(section.attrs.name).toLowerCase() !== "details"
+      ) return false;
+
+      const afterSummary = $from.after(summaryDepth);
+      const summaryIndex = $from.index(summaryDepth - 1);
+      let transaction = state.tr;
+      let selectionPosition = afterSummary;
+      if (summaryIndex === section.childCount - 1) {
+        const paragraph = paragraphSchema.type(ctx).createAndFill();
+        if (paragraph === null) return false;
+        transaction = transaction.insert(afterSummary, paragraph);
+        selectionPosition += 1;
+      }
+      transaction = transaction.setSelection(
+        TextSelection.near(
+          transaction.doc.resolve(selectionPosition),
+          1,
+        ),
+      );
+      dispatch?.(transaction.scrollIntoView());
+      return true;
     },
   },
 }));
@@ -397,15 +603,23 @@ function htmlSectionNodeView(node: ProseNode): NodeView {
     ? document.createElement("div")
     : blockContainer(parsed);
   element.replaceChildren();
-  if (element.localName === "details") element.setAttribute("open", "");
   element.classList.add("html-section");
   element.dataset.type = "html-section";
   element.dataset.htmlName = attrs.name;
 
+  let currentNode = node;
+
   return {
     dom: element,
     contentDOM: element,
-    update: (nextNode) => nextNode.sameMarkup(node),
+    update: (nextNode) => {
+      if (!nextNode.sameMarkup(currentNode)) return false;
+      currentNode = nextNode;
+      return true;
+    },
+    ignoreMutation: (mutation) =>
+      element.localName === "details" && mutation.type === "attributes" &&
+      mutation.attributeName === "open",
   };
 }
 
@@ -415,6 +629,8 @@ export function createHtmlFeature(
   return (editor) => {
     editor.use([
       htmlBlockRemark,
+      insertDetailsCommand,
+      detailsSummaryShortcut,
       $view(htmlBlockSchema.node, () => htmlBlockNodeView(config)),
       $view(htmlSectionSchema.node, () => htmlSectionNodeView),
     ].flat());

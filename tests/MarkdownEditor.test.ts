@@ -44,8 +44,10 @@ vi.mock("@milkdown/crepe", () => {
     static Feature = {
       AI: "ai",
       BlockEdit: "block-edit",
+      Cursor: "cursor",
       ImageBlock: "image-block",
       LinkTooltip: "link-tooltip",
+      Placeholder: "placeholder",
       Toolbar: "toolbar",
       TopBar: "top-bar",
     };
@@ -129,10 +131,14 @@ describe("MarkdownEditor", () => {
       "block-edit": false,
       "image-block": true,
       "link-tooltip": true,
+      placeholder: false,
       toolbar: false,
       "top-bar": true,
     });
     const imageConfig = instance.config.featureConfigs?.["image-block"];
+    expect(instance.config.featureConfigs?.cursor).toMatchObject({
+      virtual: false,
+    });
     expect(
       await (imageConfig?.proxyDomURL as (path: string) => Promise<string>)(
         "images/example.png",
@@ -153,12 +159,21 @@ describe("MarkdownEditor", () => {
     expect(view.emitted("change")).toEqual([[serialized]]);
   });
 
-  it("configures the top bar to drop the math item and add copy path via buildTopBar", async () => {
+  it("configures the extended top bar via buildTopBar", async () => {
     const view = render(MarkdownEditor, {
       props: { path: "notes/topbar.md", content: "# Heading" },
     });
     await waitFor(() => expect(crepeState.instances).toHaveLength(1));
     const instance = crepeState.instances[0]!;
+    const editor = view.container.querySelector<HTMLElement>(
+      ".markdown-editor",
+    )!;
+    expect(editor.style.getPropertyValue("--details-chevron-right")).toContain(
+      encodeURIComponent('d="m9 18 6-6-6-6"'),
+    );
+    expect(editor.style.getPropertyValue("--details-chevron-down")).toContain(
+      encodeURIComponent('d="m6 9 6 6 6-6"'),
+    );
     type Item = {
       icon: string;
       active: () => boolean;
@@ -168,11 +183,15 @@ describe("MarkdownEditor", () => {
       group: { items: { key: string }[] };
       addItem: (key: string, item: Item) => GroupInstance;
     };
-    const buildTopBar = instance.config.featureConfigs?.["top-bar"]
-      ?.buildTopBar as (builder: {
-        getGroup: (key: string) => GroupInstance;
-        addGroup: (key: string, label: string) => GroupInstance;
-      }) => void;
+    const topBarConfig = instance.config.featureConfigs?.["top-bar"];
+    expect(topBarConfig?.codeBlockIcon).toContain(
+      'class="outline-icon lucide lucide-square-terminal-icon lucide-square-terminal"',
+    );
+    expect(topBarConfig?.codeBlockIcon).toContain('d="m7 11 2-2-2-2"');
+    const buildTopBar = topBarConfig?.buildTopBar as (builder: {
+      getGroup: (key: string) => GroupInstance;
+      addGroup: (key: string, label: string) => GroupInstance;
+    }) => void;
     expect(buildTopBar).toBeInstanceOf(Function);
 
     const addedGroups: { key: string; label: string }[] = [];
@@ -219,6 +238,12 @@ describe("MarkdownEditor", () => {
       "indent",
       "outdent",
     ]);
+    expect(added["block"]!.map(({ key }) => key)).toEqual(["details"]);
+    expect(added["block"]![0]!.item.icon).toContain(
+      'class="outline-icon lucide lucide-list-collapse-icon lucide-list-collapse"',
+    );
+    expect(added["block"]![0]!.item.icon).toContain('d="M10 5h11"');
+    expect(added["block"]![0]!.item.active()).toBe(false);
     const call = vi.fn();
     const ctx = {
       get: (key: unknown) => {
@@ -236,8 +261,13 @@ describe("MarkdownEditor", () => {
     outdent!.item.onRun(ctx);
     expect(call).toHaveBeenLastCalledWith(liftListItemCommand.key);
     expect(addedGroups).toEqual([{ key: "document", label: "Document" }]);
-    expect(added["document"]).toHaveLength(2);
-    const [copyPath, openInZed] = added["document"]!;
+    expect(added["document"]).toHaveLength(3);
+    const [browseFiles, copyPath, openInZed] = added["document"]!;
+    expect(browseFiles!.key).toBe("browse-files");
+    expect(browseFiles!.item.icon).toContain("<svg");
+    expect(browseFiles!.item.active()).toBe(false);
+    browseFiles!.item.onRun(undefined);
+    expect(view.emitted("browseFiles")).toEqual([[]]);
     expect(copyPath!.key).toBe("copy-path");
     expect(copyPath!.item.icon).toContain("<svg");
     expect(copyPath!.item.active()).toBe(false);

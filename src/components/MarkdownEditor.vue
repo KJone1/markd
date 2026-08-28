@@ -19,15 +19,22 @@ import {
   promptSectionsFeature,
   restoreMarkerSources,
 } from "../editor/prompt-sections.ts";
-import { createHtmlFeature } from "../editor/html.ts";
+import {
+  createHtmlFeature,
+  insertDetailsCommand,
+} from "../editor/html.ts";
 import { inlineCodeFeature } from "../editor/inline-code.ts";
 import { footnotesFeature } from "../editor/footnotes.ts";
 import { listIndentFeature } from "../editor/list-indent.ts";
 import {
+  chevronDownMask,
+  chevronRightMask,
   copyPathIcon,
+  detailsIcon,
   fileTreeIcon,
   indentIcon,
   outdentIcon,
+  terminalIcon,
   zedIcon,
 } from "../editor/icons.ts";
 import { createTooltipHost, type TooltipHost } from "../editor/tooltips.ts";
@@ -52,6 +59,10 @@ const emit = defineEmits<{
   copyPath: [];
   openInZed: [];
 }>();
+const detailsIconStyle = {
+  "--details-chevron-right": chevronRightMask,
+  "--details-chevron-down": chevronDownMask,
+};
 
 const host = ref<HTMLElement>();
 let crepe: Crepe | null = null;
@@ -202,11 +213,12 @@ function labelEditorControls(): void {
     [".milkdown-top-bar .top-bar-item:nth-of-type(11)", "Insert image", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(12)", "Insert table", "pointerdown"],
     [".milkdown-top-bar .top-bar-item:nth-of-type(13)", "Code block", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(14)", "Quote", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(15)", "Divider", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(16)", "Browse files", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(17)", "Copy file path", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(18)", "Open in Zed", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(14)", "Insert collapsible section", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(15)", "Quote", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(16)", "Divider", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(17)", "Browse files", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(18)", "Copy file path", "pointerdown"],
+    [".milkdown-top-bar .top-bar-item:nth-of-type(19)", "Open in Zed", "pointerdown"],
   ] as const;
   for (const [selector, label, activationEvent] of controlLabels) {
     host.value?.querySelectorAll<HTMLElement>(selector).forEach((control) => {
@@ -284,10 +296,14 @@ onMounted(async () => {
       [Crepe.Feature.BlockEdit]: false,
       [Crepe.Feature.ImageBlock]: true,
       [Crepe.Feature.LinkTooltip]: true,
+      [Crepe.Feature.Placeholder]: false,
       [Crepe.Feature.Toolbar]: false,
       [Crepe.Feature.TopBar]: true,
     },
     featureConfigs: {
+      [Crepe.Feature.Cursor]: {
+        virtual: false,
+      },
       [Crepe.Feature.ImageBlock]: {
         proxyDomURL: (url: string) => props.resolveImage?.(url) ?? url,
         inlineOnUpload: () =>
@@ -296,6 +312,7 @@ onMounted(async () => {
           Promise.reject(new Error("File upload is unavailable")),
       },
       [Crepe.Feature.TopBar]: {
+        codeBlockIcon: terminalIcon,
         buildTopBar: (builder) => {
           const list = builder.getGroup("list");
           list.addItem("indent", {
@@ -312,6 +329,12 @@ onMounted(async () => {
           block.group.items = block.group.items.filter(
             (item) => item.key !== "math",
           );
+          block.addItem("details", {
+            icon: detailsIcon,
+            active: () => false,
+            onRun: (ctx) =>
+              ctx.get(commandsCtx).call(insertDetailsCommand.key),
+          });
           const documentGroup = builder.addGroup("document", "Document");
           documentGroup.addItem("browse-files", {
             icon: fileTreeIcon,
@@ -401,6 +424,7 @@ onBeforeUnmount(destroyEditor);
     ref="host"
     class="markdown-editor"
     :aria-label="`Markdown editor for ${path}`"
+    :style="detailsIconStyle"
   />
 </template>
 
@@ -689,6 +713,94 @@ onBeforeUnmount(destroyEditor);
 
 .markdown-editor :deep(.html-section) {
   margin: var(--space-md) 0;
+}
+
+.markdown-editor :deep(details.html-section) {
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 5%);
+}
+
+.markdown-editor :deep(details.html-section > summary.details-summary) {
+  --details-chevron: var(--details-chevron-right);
+
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-lg) var(--space-xs) var(--space-xs);
+  color: var(--color-ink);
+  background: var(--color-hairline-soft);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.markdown-editor :deep(details.html-section > summary.details-summary::before) {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  content: "";
+  color: var(--color-muted);
+  background: currentColor;
+  mask: var(--details-chevron) center / contain no-repeat;
+  -webkit-mask: var(--details-chevron) center / contain no-repeat;
+}
+
+.markdown-editor :deep(
+  details.html-section > summary.details-summary::-webkit-details-marker
+) {
+  display: none;
+}
+
+.markdown-editor :deep(details.html-section[open] > summary.details-summary) {
+  --details-chevron: var(--details-chevron-down);
+
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.markdown-editor :deep(details.html-section > summary.details-summary:focus),
+.markdown-editor :deep(details.html-section > summary.details-summary:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+.markdown-editor :deep(
+  details.html-section > summary.details-summary::selection
+) {
+  background: transparent;
+}
+
+.markdown-editor :deep(
+  details.html-section > summary.details-summary::-moz-selection
+) {
+  background: transparent;
+}
+
+.markdown-editor :deep(details.html-section.ProseMirror-selectednode) {
+  background: var(--color-surface);
+  outline: none;
+}
+
+.markdown-editor :deep(
+  details.html-section > summary.details-summary.ProseMirror-selectednode
+) {
+  background: var(--color-hairline-soft);
+  outline: none;
+}
+
+.markdown-editor :deep(details.html-section > :not(summary)) {
+  margin-right: var(--space-lg);
+  margin-left: var(--space-lg);
+}
+
+.markdown-editor :deep(details.html-section > summary + *) {
+  margin-top: var(--space-md);
+}
+
+.markdown-editor :deep(details.html-section > :last-child:not(summary)) {
+  margin-bottom: var(--space-md);
 }
 
 .markdown-editor :deep(.html-section[align="center"]),
