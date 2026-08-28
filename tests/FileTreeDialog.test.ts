@@ -145,6 +145,48 @@ describe("FileTreeDialog", () => {
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 
+  it("keeps pointer hover out of managed tree focus", async () => {
+    render(FileTreeDialog, {
+      props: { open: true, entries, currentPath: "README.md" },
+    });
+    const selected = await screen.findByRole("treeitem", {
+      name: /README\.md/,
+    });
+    await waitFor(() => expect(document.activeElement).toBe(selected));
+
+    const branch = document.querySelector<HTMLElement>(
+      '[data-part="branch-control"][data-value="notes"]',
+    );
+    expect(branch).not.toBeNull();
+    await fireEvent.mouseEnter(branch!);
+
+    expect(document.activeElement).toBe(selected);
+  });
+
+  it("mounts only expanded directory contents", async () => {
+    render(FileTreeDialog, {
+      props: { open: true, entries, currentPath: "README.md" },
+    });
+    await screen.findByRole("dialog", { name: "Open a file" });
+
+    const nestedSelector = '[data-part="item"][data-value="notes/guide.md"]';
+    expect(document.querySelector(nestedSelector)).toBeNull();
+
+    const branch = document.querySelector<HTMLElement>(
+      '[data-part="branch-control"][data-value="notes"]',
+    );
+    expect(branch).not.toBeNull();
+    await fireEvent.click(branch!);
+    await waitFor(() =>
+      expect(document.querySelector(nestedSelector)).not.toBeNull()
+    );
+
+    await fireEvent.click(branch!);
+    await waitFor(() =>
+      expect(document.querySelector(nestedSelector)).toBeNull()
+    );
+  });
+
   it("keeps the search Escape workflow and opens the selected file", async () => {
     const view = render(FileTreeDialog, {
       props: { open: true, entries, currentPath: "README.md" },

@@ -7,12 +7,6 @@ defineProps<{
   indexPath: number[];
   onFileOpen: (path: string) => void;
 }>();
-
-/* The pointer drives the same cursor as the arrow keys, so only one row is
-   ever marked. */
-function focusRow(event: MouseEvent): void {
-  (event.currentTarget as HTMLElement).focus({ preventScroll: true });
-}
 </script>
 
 <template>
@@ -22,10 +16,7 @@ function focusRow(event: MouseEvent): void {
         v-if="node.kind === 'directory'"
         class="file-tree-branch"
       >
-        <TreeView.BranchControl
-          class="file-tree-branch-control"
-          @mouseenter="focusRow"
-        >
+        <TreeView.BranchControl class="file-tree-branch-control">
           <TreeView.BranchIndicator class="file-tree-branch-indicator">
             <svg
               viewBox="0 0 24 24"
@@ -85,7 +76,6 @@ function focusRow(event: MouseEvent): void {
       <TreeView.Item
         v-else
         class="file-tree-item"
-        @mouseenter="focusRow"
         @click="onFileOpen(node.path)"
         @keydown.enter="onFileOpen(node.path)"
       >
@@ -148,6 +138,7 @@ function focusRow(event: MouseEvent): void {
   cursor: pointer;
 }
 
+.file-tree-branch-control:hover,
 .file-tree-branch-control[data-focus] {
   background: var(--color-hairline-soft);
 }
@@ -162,18 +153,6 @@ function focusRow(event: MouseEvent): void {
 
 .file-tree-branch-content {
   position: relative;
-}
-
-.file-tree-branch-content[data-state="open"] {
-  animation:
-    expand-height 150ms ease-out,
-    fade-in 150ms ease-out;
-}
-
-.file-tree-branch-content[data-state="closed"] {
-  animation:
-    collapse-height 150ms ease-out,
-    fade-out 150ms ease-out;
 }
 
 .file-tree-indent-guide {
@@ -248,6 +227,7 @@ function focusRow(event: MouseEvent): void {
   cursor: pointer;
 }
 
+.file-tree-item:hover,
 .file-tree-item[data-focus] {
   background: var(--color-hairline-soft);
 }
@@ -270,43 +250,4 @@ function focusRow(event: MouseEvent): void {
   white-space: nowrap;
 }
 
-@keyframes expand-height {
-  from {
-    height: 0;
-  }
-
-  to {
-    height: var(--height);
-  }
-}
-
-@keyframes collapse-height {
-  from {
-    height: var(--height);
-  }
-
-  to {
-    height: 0;
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes fade-out {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0;
-  }
-}
 </style>

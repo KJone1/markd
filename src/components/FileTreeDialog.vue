@@ -301,6 +301,8 @@ function searchItemId(path: string): string {
             v-model:expanded-value="expandedValue"
             :selected-value="selectedValue"
             :collection="collection"
+            lazy-mount
+            unmount-on-exit
             class="file-tree-root"
           >
             <TreeView.Label class="visually-hidden">Workspace files</TreeView.Label>
