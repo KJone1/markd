@@ -399,14 +399,15 @@ function selectHeading(action: string): void {
 .editor-top-bar-heading,
 .editor-top-bar-item {
   border: 0;
-  color: var(--color-ink);
+  color: var(--color-muted);
   background: transparent;
   border-radius: 4px;
   cursor: pointer;
 }
 
 .editor-top-bar-heading:hover:not(:disabled),
-.editor-top-bar-item:hover:not(:disabled) {
+.editor-top-bar-item:not([aria-pressed="true"]):hover:not(:disabled) {
+  color: var(--color-ink);
   background: var(--color-hairline-soft);
 }
 
@@ -431,7 +432,6 @@ function selectHeading(action: string): void {
   gap: 4px;
   margin: 6px;
   padding: 4px 4px 4px 10px;
-  color: var(--color-ink);
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
@@ -446,7 +446,6 @@ function selectHeading(action: string): void {
   flex: none;
   align-items: center;
   justify-content: center;
-  color: var(--color-ink);
 }
 
 .editor-top-bar-chevron :deep(svg) {
