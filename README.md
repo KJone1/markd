@@ -21,12 +21,12 @@ A minimalist local editor built because existing markdown tools fail to cleanly 
 
 ## Usage
 
-```bash
+```Shell
 just run
 ```
 
 Install the app and the `markd` command into `~/.local/bin`:
 
-```bash
+```Shell
 just install
 ```
