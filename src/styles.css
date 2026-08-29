@@ -109,54 +109,6 @@ button {
   font: inherit;
 }
 
-/* Appended to document.body by src/editor/tooltips.ts, outside every component subtree. */
-.markd-tooltip {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 1500;
-  padding: 4px var(--space-xs);
-  background: var(--color-ink);
-  color: var(--color-surface);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgb(15 23 42 / 8%);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 16px;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: markd-tooltip-in 150ms ease-out;
-}
-
-.markd-tooltip-arrow {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  margin-left: -4px;
-  background: inherit;
-  transform: rotate(45deg);
-}
-
-.markd-tooltip[data-placement="top"] .markd-tooltip-arrow {
-  bottom: -4px;
-}
-
-.markd-tooltip[data-placement="bottom"] .markd-tooltip-arrow {
-  top: -4px;
-}
-
-@keyframes markd-tooltip-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -166,4 +118,5 @@ button {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+
 }

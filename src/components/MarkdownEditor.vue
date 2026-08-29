@@ -2,13 +2,9 @@
 import { Crepe } from "@milkdown/crepe";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/frame.css";
-import { commandsCtx } from "@milkdown/kit/core";
-import {
-  liftListItemCommand,
-  sinkListItemCommand,
-} from "@milkdown/kit/preset/commonmark";
 import { replaceAll } from "@milkdown/kit/utils";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import TopBar from "./TopBar.vue";
 import {
   frontmatterFeature,
   prepareFrontmatterMarkdown,
@@ -19,10 +15,7 @@ import {
   promptSectionsFeature,
   restoreMarkerSources,
 } from "../editor/prompt-sections.ts";
-import {
-  createHtmlFeature,
-  insertDetailsCommand,
-} from "../editor/html.ts";
+import { createHtmlFeature } from "../editor/html.ts";
 import { inlineCodeFeature } from "../editor/inline-code.ts";
 import { footnotesFeature } from "../editor/footnotes.ts";
 import { listIndentFeature } from "../editor/list-indent.ts";
@@ -30,20 +23,19 @@ import {
   chevronDownMask,
   chevronRightMask,
   codeMirrorIcons,
-  copyPathIcon,
-  detailsIcon,
-  fileTreeIcon,
   imageBlockIcons,
-  indentIcon,
   latexIcons,
   linkTooltipIcons,
   listItemIcons,
-  outdentIcon,
   tableIcons,
-  topBarIcons,
-  zedIcon,
 } from "../editor/icons.ts";
-import { createTooltipHost, type TooltipHost } from "../editor/tooltips.ts";
+import {
+  createTopBarStateFeature,
+  DEFAULT_TOP_BAR_STATE,
+  runTopBarAction,
+  type TopBarActionId,
+  type TopBarState,
+} from "../editor/top-bar.ts";
 
 function prepareMarkdown(markdown: string): string {
   return preparePromptSectionMarkdown(prepareFrontmatterMarkdown(markdown));
@@ -71,13 +63,13 @@ const detailsIconStyle = {
 };
 
 const host = ref<HTMLElement>();
+const topBarState = ref<TopBarState>(DEFAULT_TOP_BAR_STATE);
 let crepe: Crepe | null = null;
 let createFinished = false;
 let destroyRequested = false;
 let destroyed = false;
 let applyingExternalChange = false;
 let controlObserver: MutationObserver | null = null;
-let tooltips: TooltipHost | null = null;
 
 function isEphemeralImageUrl(url: string): boolean {
   return url.trim().toLowerCase().startsWith("blob:");
@@ -206,36 +198,12 @@ function labelEditorControls(): void {
     ["[data-role='row-drag-handle'] button", "Delete row", "pointerdown"],
     ["[data-role='x-line-drag-handle'] button", "Add row", "pointerdown"],
     ["[data-role='y-line-drag-handle'] button", "Add column", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(1)", "Bold", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(2)", "Italic", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(3)", "Strikethrough", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(4)", "Inline code", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(5)", "Bullet list", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(6)", "Ordered list", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(7)", "Task list", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(8)", "Indent list item", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(9)", "Outdent list item", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(10)", "Insert link", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(11)", "Insert image", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(12)", "Insert table", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(13)", "Code block", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(14)", "Insert collapsible section", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(15)", "Quote", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(16)", "Divider", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(17)", "Browse files", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(18)", "Copy file path", "pointerdown"],
-    [".milkdown-top-bar .top-bar-item:nth-of-type(19)", "Open in Zed", "pointerdown"],
   ] as const;
   for (const [selector, label, activationEvent] of controlLabels) {
     host.value?.querySelectorAll<HTMLElement>(selector).forEach((control) => {
       enhanceKeyboardButton(control, label, activationEvent);
     });
   }
-  host.value?.querySelectorAll<HTMLElement>(
-    ".milkdown-top-bar .top-bar-item",
-  ).forEach((item) => {
-    if (item.hasAttribute("aria-label")) tooltips?.attach(item);
-  });
   host.value?.querySelectorAll<HTMLElement>(".image-resize-handle").forEach(
     enhanceImageResizeHandle,
   );
@@ -268,6 +236,7 @@ function labelEditorControls(): void {
 }
 
 function destroyEditor(): void {
+  topBarState.value = DEFAULT_TOP_BAR_STATE;
   if (crepe === null || destroyed) return;
   if (!createFinished) {
     destroyRequested = true;
@@ -276,8 +245,6 @@ function destroyEditor(): void {
   destroyed = true;
   controlObserver?.disconnect();
   controlObserver = null;
-  tooltips?.destroy();
-  tooltips = null;
   host.value?.removeEventListener(
     "keydown",
     preventEphemeralImageConfirmation,
@@ -292,6 +259,25 @@ function destroyEditor(): void {
   crepe = null;
 }
 
+function handleTopBarAction(action: TopBarActionId): void {
+  switch (action) {
+    case "browse-files":
+      emit("browseFiles");
+      return;
+    case "copy-path":
+      emit("copyPath");
+      return;
+    case "open-in-zed":
+      emit("openInZed");
+      return;
+  }
+  if (
+    crepe === null || !createFinished || !topBarState.value.ready ||
+    !topBarState.value.editable
+  ) return;
+  crepe.editor.action((ctx) => runTopBarAction(ctx, action));
+}
+
 onMounted(async () => {
   if (host.value === undefined) return;
   const instance = new Crepe({
@@ -304,7 +290,7 @@ onMounted(async () => {
       [Crepe.Feature.LinkTooltip]: true,
       [Crepe.Feature.Placeholder]: false,
       [Crepe.Feature.Toolbar]: false,
-      [Crepe.Feature.TopBar]: true,
+      [Crepe.Feature.TopBar]: false,
     },
     featureConfigs: {
       [Crepe.Feature.Cursor]: {
@@ -323,48 +309,6 @@ onMounted(async () => {
       [Crepe.Feature.LinkTooltip]: linkTooltipIcons,
       [Crepe.Feature.ListItem]: listItemIcons,
       [Crepe.Feature.Table]: tableIcons,
-      [Crepe.Feature.TopBar]: {
-        ...topBarIcons,
-        buildTopBar: (builder) => {
-          const list = builder.getGroup("list");
-          list.addItem("indent", {
-            icon: indentIcon,
-            active: () => false,
-            onRun: (ctx) => ctx.get(commandsCtx).call(sinkListItemCommand.key),
-          });
-          list.addItem("outdent", {
-            icon: outdentIcon,
-            active: () => false,
-            onRun: (ctx) => ctx.get(commandsCtx).call(liftListItemCommand.key),
-          });
-          const block = builder.getGroup("block");
-          block.group.items = block.group.items.filter(
-            (item) => item.key !== "math",
-          );
-          block.addItem("details", {
-            icon: detailsIcon,
-            active: () => false,
-            onRun: (ctx) =>
-              ctx.get(commandsCtx).call(insertDetailsCommand.key),
-          });
-          const documentGroup = builder.addGroup("document", "Document");
-          documentGroup.addItem("browse-files", {
-            icon: fileTreeIcon,
-            active: () => false,
-            onRun: () => emit("browseFiles"),
-          });
-          documentGroup.addItem("copy-path", {
-            icon: copyPathIcon,
-            active: () => false,
-            onRun: () => emit("copyPath"),
-          });
-          documentGroup.addItem("open-in-zed", {
-            icon: zedIcon,
-            active: () => false,
-            onRun: () => emit("openInZed"),
-          });
-        },
-      },
     },
   });
   instance.addFeature(frontmatterFeature);
@@ -374,6 +318,9 @@ onMounted(async () => {
   instance.addFeature(listIndentFeature);
   instance.addFeature(createHtmlFeature({
     resolveImage: (path) => props.resolveImage?.(path),
+  }));
+  instance.addFeature(createTopBarStateFeature((state) => {
+    if (!destroyRequested && !destroyed) topBarState.value = state;
   }));
   crepe = instance;
   instance.on((listener) => {
@@ -393,7 +340,6 @@ onMounted(async () => {
     destroyEditor();
     return;
   }
-  tooltips = createTooltipHost();
   labelEditorControls();
   controlObserver = new MutationObserver(labelEditorControls);
   controlObserver.observe(host.value, { childList: true, subtree: true });
@@ -433,20 +379,32 @@ onBeforeUnmount(destroyEditor);
 
 <template>
   <section
-    ref="host"
     class="markdown-editor"
     :aria-label="`Markdown editor for ${path}`"
     :style="detailsIconStyle"
-  />
+  >
+    <TopBar :state="topBarState" @run="handleTopBarAction" />
+    <div ref="host" class="markdown-editor-host" />
+  </section>
 </template>
 
 <style scoped>
 .markdown-editor {
+  display: flex;
   width: 100%;
   height: 100%;
-  overflow: hidden auto;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
   color: var(--color-body);
   background: var(--color-canvas);
+}
+
+.markdown-editor-host {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden auto;
   overscroll-behavior: contain;
 }
 
@@ -478,17 +436,6 @@ onBeforeUnmount(destroyEditor);
   --crepe-font-code: "JetBrains Mono", ui-monospace, monospace;
   --crepe-shadow-1: 0 4px 12px rgb(15 23 42 / 8%);
   --crepe-shadow-2: 0 10px 15px -3px rgb(15 23 42 / 12%);
-}
-
-.markdown-editor :deep(.milkdown .milkdown-top-bar) {
-  flex: none;
-  padding: 0 var(--space-md);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-hairline);
-}
-
-.markdown-editor :deep(.milkdown .milkdown-top-bar .top-bar-divider) {
-  background: var(--color-hairline);
 }
 
 /* Crepe fills its SVG icons by default, which turns Lucide strokes into blobs. */
@@ -567,7 +514,7 @@ onBeforeUnmount(destroyEditor);
 
 .markdown-editor :deep(.milkdown .milkdown-code-block) {
   margin: var(--space-md) 0;
-  overflow: hidden;
+  overflow: visible;
   border-radius: var(--radius-md);
   --crepe-color-surface: #282c34;
   --crepe-color-surface-low: #21252b;
@@ -576,6 +523,29 @@ onBeforeUnmount(destroyEditor);
   --crepe-color-secondary: #3a4149;
   --crepe-color-hover: #3a4149;
   --crepe-color-outline: #6b7280;
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .list-wrapper) {
+  color: var(--crepe-color-on-surface);
+}
+
+.markdown-editor :deep(.milkdown .milkdown-code-block .search-box) {
+  background: var(--crepe-color-surface);
+  outline: none;
+}
+
+.markdown-editor :deep(
+  .milkdown .milkdown-code-block .search-box:has(input:focus)
+) {
+  background: var(--crepe-color-hover);
+  outline: none;
+}
+
+.markdown-editor :deep(
+  .milkdown .milkdown-code-block .search-input:focus-visible
+) {
+  outline: none;
+  box-shadow: none;
 }
 
 .markdown-editor :deep(.milkdown .milkdown-code-block .milkdown-code-block-placeholder) {

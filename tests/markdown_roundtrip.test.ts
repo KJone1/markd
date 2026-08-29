@@ -317,7 +317,7 @@ describe("Top bar", () => {
     expect(editor.classList.contains("virtual-cursor-enabled")).toBe(false);
     expect(editor.querySelector(".prosemirror-virtual-cursor")).toBeNull();
 
-    expect(view.container.querySelector(".milkdown-top-bar")).toBeTruthy();
+    expect(view.container.querySelector(".editor-top-bar")).toBeTruthy();
     expect(await screen.findByRole("button", { name: "Paragraph" }))
       .toBeTruthy();
     for (
@@ -346,7 +346,7 @@ describe("Top bar", () => {
       expect(await screen.findByRole("button", { name })).toBeTruthy();
     }
     expect(
-      view.container.querySelectorAll(".milkdown-top-bar .top-bar-item"),
+      view.container.querySelectorAll(".editor-top-bar .editor-top-bar-item"),
     ).toHaveLength(19);
 
     const paragraph = view.container.querySelector(".ProseMirror p")!;
@@ -365,11 +365,9 @@ describe("Top bar", () => {
     const editor = await screen.findByRole("textbox", {
       name: "Editing notes/details.md",
     });
-    await fireEvent.pointerDown(
-      await screen.findByRole("button", {
-        name: "Insert collapsible section",
-      }),
-    );
+    await fireEvent.click(await screen.findByRole("button", {
+      name: "Insert collapsible section",
+    }));
 
     const details = await waitFor(() => {
       const element = editor.querySelector<HTMLDetailsElement>("details");
@@ -405,11 +403,11 @@ describe("Top bar", () => {
     const headingButton = await screen.findByRole("button", {
       name: "Paragraph",
     });
-    await fireEvent.pointerDown(headingButton);
-    const headingOneOption = await screen.findByRole("button", {
+    await fireEvent.click(headingButton);
+    const headingOneOption = await screen.findByRole("menuitemradio", {
       name: "Heading 1",
     });
-    await fireEvent.pointerDown(headingOneOption);
+    await fireEvent.click(headingOneOption);
 
     await waitFor(() => {
       const markdown = view.emitted<string[]>("change").at(-1)![0]!;

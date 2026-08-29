@@ -1,10 +1,5 @@
-import { cleanup, render, waitFor } from "@testing-library/vue";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { commandsCtx } from "@milkdown/kit/core";
-import {
-  liftListItemCommand,
-  sinkListItemCommand,
-} from "@milkdown/kit/preset/commonmark";
 import MarkdownEditor from "../src/components/MarkdownEditor.vue";
 
 interface MockCrepeInstance {
@@ -137,7 +132,7 @@ describe("MarkdownEditor", () => {
       "link-tooltip": true,
       placeholder: false,
       toolbar: false,
-      "top-bar": true,
+      "top-bar": false,
     });
     const imageConfig = instance.config.featureConfigs?.["image-block"];
     expect(instance.config.featureConfigs?.cursor).toMatchObject({
@@ -163,7 +158,7 @@ describe("MarkdownEditor", () => {
     expect(view.emitted("change")).toEqual([[serialized]]);
   });
 
-  it("configures the extended top bar via buildTopBar", async () => {
+  it("renders the custom top bar and preserves non-top-bar configuration", async () => {
     const view = render(MarkdownEditor, {
       props: { path: "notes/topbar.md", content: "# Heading" },
     });
@@ -178,20 +173,8 @@ describe("MarkdownEditor", () => {
     expect(editor.style.getPropertyValue("--details-chevron-down")).toContain(
       encodeURIComponent('d="m6 9 6 6 6-6"'),
     );
-    type Item = {
-      icon: string;
-      active: () => boolean;
-      onRun: (ctx: unknown) => void;
-    };
-    type GroupInstance = {
-      group: { items: { key: string }[] };
-      addItem: (key: string, item: Item) => GroupInstance;
-    };
-    const topBarConfig = instance.config.featureConfigs?.["top-bar"];
-    expect(topBarConfig?.codeBlockIcon).toContain(
-      'class="lucide-icon"',
-    );
-    expect(topBarConfig?.codeBlockIcon).toContain('d="m7 11 2-2-2-2"');
+    expect(instance.config.features["top-bar"]).toBe(false);
+    expect(instance.config.featureConfigs?.["top-bar"]).toBeUndefined();
     for (
       const [feature, fields] of Object.entries({
         "code-mirror": [
@@ -229,23 +212,6 @@ describe("MarkdownEditor", () => {
           "colDragHandleIcon",
           "rowDragHandleIcon",
         ],
-        "top-bar": [
-          "boldIcon",
-          "italicIcon",
-          "strikethroughIcon",
-          "codeIcon",
-          "linkIcon",
-          "imageIcon",
-          "tableIcon",
-          "codeBlockIcon",
-          "mathIcon",
-          "quoteIcon",
-          "hrIcon",
-          "bulletListIcon",
-          "orderedListIcon",
-          "taskListIcon",
-          "chevronDownIcon",
-        ],
       })
     ) {
       for (const field of fields) {
@@ -258,95 +224,19 @@ describe("MarkdownEditor", () => {
       ?.previewToggleIcon as (previewOnlyMode: boolean) => string;
     expect(previewToggleIcon(true)).toContain('class="lucide-icon"');
     expect(previewToggleIcon(false)).toContain('class="lucide-icon"');
-    const buildTopBar = topBarConfig?.buildTopBar as (builder: {
-      getGroup: (key: string) => GroupInstance;
-      addGroup: (key: string, label: string) => GroupInstance;
-    }) => void;
-    expect(buildTopBar).toBeInstanceOf(Function);
-
-    const addedGroups: { key: string; label: string }[] = [];
-    const added: Record<string, { key: string; item: Item }[]> = {};
-    const groupInstance = (
-      name: string,
-      items: { key: string }[],
-    ): GroupInstance => {
-      added[name] = [];
-      const group = { items };
-      const self: GroupInstance = {
-        group,
-        addItem: (key, item) => {
-          added[name]!.push({ key, item });
-          return self;
-        },
-      };
-      return self;
-    };
-    const blockGroup = groupInstance("block", [
-      { key: "code-block" },
-      { key: "math" },
-    ]);
-    const listGroup = groupInstance("list", [
-      { key: "bullet-list" },
-      { key: "ordered-list" },
-    ]);
-    buildTopBar({
-      getGroup: (key) => (key === "block" ? blockGroup : listGroup),
-      addGroup: (key, label) => {
-        addedGroups.push({ key, label });
-        return groupInstance(key, []);
-      },
+    const toolbar = view.getByRole("toolbar", {
+      name: "Markdown formatting",
     });
+    expect(view.getByRole("button", { name: "Paragraph" })).toBeTruthy();
+    expect(toolbar.querySelectorAll(".editor-top-bar-item")).toHaveLength(19);
 
-    expect(blockGroup.group.items.map((item) => item.key)).toEqual([
-      "code-block",
-    ]);
-    expect(listGroup.group.items.map((item) => item.key)).toEqual([
-      "bullet-list",
-      "ordered-list",
-    ]);
-    expect(added["list"]!.map(({ key }) => key)).toEqual([
-      "indent",
-      "outdent",
-    ]);
-    expect(added["block"]!.map(({ key }) => key)).toEqual(["details"]);
-    expect(added["block"]![0]!.item.icon).toContain(
-      'class="lucide-icon"',
-    );
-    expect(added["block"]![0]!.item.icon).toContain('d="M10 5h11"');
-    expect(added["block"]![0]!.item.active()).toBe(false);
-    const call = vi.fn();
-    const ctx = {
-      get: (key: unknown) => {
-        expect(key).toBe(commandsCtx);
-        return { call };
-      },
-    };
-    const [indent, outdent] = added["list"]!;
-    for (const { item } of [indent!, outdent!]) {
-      expect(item.icon).toContain("<svg");
-      expect(item.active()).toBe(false);
-    }
-    indent!.item.onRun(ctx);
-    expect(call).toHaveBeenLastCalledWith(sinkListItemCommand.key);
-    outdent!.item.onRun(ctx);
-    expect(call).toHaveBeenLastCalledWith(liftListItemCommand.key);
-    expect(addedGroups).toEqual([{ key: "document", label: "Document" }]);
-    expect(added["document"]).toHaveLength(3);
-    const [browseFiles, copyPath, openInZed] = added["document"]!;
-    expect(browseFiles!.key).toBe("browse-files");
-    expect(browseFiles!.item.icon).toContain("<svg");
-    expect(browseFiles!.item.active()).toBe(false);
-    browseFiles!.item.onRun(undefined);
+    await fireEvent.click(view.getByRole("button", { name: "Browse files" }));
     expect(view.emitted("browseFiles")).toEqual([[]]);
-    expect(copyPath!.key).toBe("copy-path");
-    expect(copyPath!.item.icon).toContain("<svg");
-    expect(copyPath!.item.active()).toBe(false);
-    copyPath!.item.onRun(undefined);
+    await fireEvent.click(
+      view.getByRole("button", { name: "Copy file path" }),
+    );
     expect(view.emitted("copyPath")).toEqual([[]]);
-    expect(openInZed!.key).toBe("open-in-zed");
-    expect(openInZed!.item.icon).toContain("<svg");
-    expect(openInZed!.item.active()).toBe(false);
-    openInZed!.item.onRun(undefined);
+    await fireEvent.click(view.getByRole("button", { name: "Open in Zed" }));
     expect(view.emitted("openInZed")).toEqual([[]]);
   });
 
